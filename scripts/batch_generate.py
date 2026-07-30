@@ -89,6 +89,45 @@ def _resolve_lang(raw: str) -> str:
     return key
 
 
+# Maps content levels (intro/core/college/research, per CLAUDE.md's learner-
+# progression axis) to a spl/style_profiles.py profile name. build_concept_book.spl
+# has no @lvl input parameter — only @style — so passing --param lvl=... (the
+# prior behavior) was silently ignored by spl3 and every job generated at the
+# hardcoded @style DEFAULT 'textbook' (university/calculus-background audience)
+# regardless of the requested level. This map is what --level actually controls now.
+#
+# college -> "college" (not "textbook"): "textbook"'s structure forces a "Key
+# theorem" + notation-heavy treatment on every concept regardless of whether the
+# concept is actually mathematical (e.g. it produced relational-algebra notation
+# and a forced "Key Theorem (ACID Guarantees)" for a systems concept like DBMS).
+# "college" makes that formalism conditional on the concept's own nature; forced
+# rigorous math/proof notation is reserved for "research".
+_LEVEL_TO_STYLE: dict[str, str] = {
+    "intro":    "feynman",
+    "core":     "core",
+    "college":  "college",
+    "research": "research",
+}
+
+# Domain catalog "tags" values for which full mathematical/proof-notation rigor
+# (the "research" style profile) is appropriate at research level. Any other
+# domain — technology, chemistry, biology, etc. — falls back to
+# "research_applied" instead: same graduate-level depth and citation-readiness,
+# but without inventing math/proof notation for concepts that aren't themselves
+# mathematical results (systems, protocols, regulations, biological mechanisms,
+# chemical processes). Math/proof notation is otherwise reserved for these three
+# tags at research level; "college" level is separately conditional per-concept
+# (see the "college" style profile's own depth instruction).
+_STEM_MATH_TAGS = {"math", "physics", "engineering"}
+
+
+def _resolve_style(level: str, tags: list[str]) -> str:
+    style = _LEVEL_TO_STYLE.get(level, "college")
+    if style == "research" and not (_STEM_MATH_TAGS & set(tags)):
+        return "research_applied"
+    return style
+
+
 # Maps spl3 llm strings → short model names used as folder segments.
 # For ollama:{name}, the name is used directly if not listed here.
 _LLM_TO_MODEL: dict[str, str] = {
@@ -195,6 +234,7 @@ def _run_spl3(
     domain_id: str,
     target: str,
     level: str,
+    style: str,
     language: str,
     model: str,
     spl_dir: Path,
@@ -226,7 +266,7 @@ def _run_spl3(
         "--llm", llm,
         "--param", f"domain_yaml={domain_yaml_path}",
         "--param", f"target={target}",
-        "--param", f"lvl={level}",
+        "--param", f"style={style}",
         "--param", f"language={language}",
         "--param", f"output_dir={output_dir}",
         "--param", f"skip_cache={'yes' if skip_cache else 'no'}",
@@ -327,10 +367,11 @@ def main(
         if missing:
             click.echo(f"[warn] Unknown domain(s): {', '.join(sorted(missing))}", err=True)
 
-    jobs = []  # list of (domain_id, target, eff_level)
+    jobs = []  # list of (domain_id, target, eff_level, style)
     for entry in targets_domains:
         did = entry["id"]
-        eff_level = level or entry.get("default_level", "intro")
+        eff_level = level or entry.get("default_level", "college")
+        style = _resolve_style(eff_level, entry.get("tags", []))
         app_ids = _get_application_ids(did)
         if not app_ids:
             click.echo(f"[skip] {did}: no application nodes in graph.yaml")
@@ -340,28 +381,28 @@ def main(
             if skip_existing and _already_generated(entry, target, model, language, eff_level):
                 click.echo(f"[skip] {did}/{target} ({model}): already in catalog")
                 continue
-            jobs.append((did, target, eff_level))
+            jobs.append((did, target, eff_level, style))
 
     if not jobs:
         click.echo("No jobs to run.")
         return
 
     click.echo(f"\n{'DRY RUN — ' if dry_run else ''}Planned {len(jobs)} generation job(s)  [model={model}]:\n")
-    for did, target, eff_level in jobs:
-        click.echo(f"  {did:30s}  target={target:35s}  level={eff_level}")
+    for did, target, eff_level, style in jobs:
+        click.echo(f"  {did:30s}  target={target:35s}  level={eff_level:10s}  style={style}")
     click.echo()
 
     if dry_run:
         return
 
     succeeded, failed = 0, 0
-    for idx, (did, target, eff_level) in enumerate(jobs):
+    for idx, (did, target, eff_level, style) in enumerate(jobs):
         click.echo(f"{'='*70}")
-        click.echo(f"GENERATING  domain={did}  target={target}  level={eff_level}  lang={language}  model={model}")
+        click.echo(f"GENERATING  domain={did}  target={target}  level={eff_level}  style={style}  lang={language}  model={model}")
         click.echo(f"{'='*70}")
 
         try:
-            ok = _run_spl3(did, target, eff_level, language, model, spl_dir, llm, skip_cache)
+            ok = _run_spl3(did, target, eff_level, style, language, model, spl_dir, llm, skip_cache)
         except SessionLimitHit as exc:
             click.echo(f"[FAIL] {did}/{target}: session/rate limit reached — {exc.line}", err=True)
             remaining = len(jobs) - idx - 1

@@ -107,6 +107,7 @@ def sync_chapter(book: str, chapter: int, domain_prefix: str, dry_run: bool) -> 
         "capstone": capstone or "",
         **stats,
         "tags": ["science"],
+        "default_level": "college",
         "has_navigator": True,
         "has_book": False,
         "books": [],

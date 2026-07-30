@@ -140,10 +140,17 @@ DO
     CALL setup_domain(@domain_yaml, @target, @payoff_weight) INTO @_
     CALL get_style_guide(@style) INTO @style_guide
     CALL language_name(@language) INTO @language_label
-    -- Cache key must vary with @language: without this, the same concept
-    -- generated in two languages collides on one cache slot and the later
-    -- write silently overwrites the earlier language's cached content.
+    -- Cache key must vary with @language and @style: without @language, the
+    -- same concept generated in two languages collides on one cache slot and
+    -- the later write silently overwrites the earlier language's cached
+    -- content. Without @style, a concept generated once under any style
+    -- (e.g. the first --level run) gets silently reused for every later
+    -- --level/style request, regardless of what was actually asked for —
+    -- confirmed via cb-data-science/docs/readme-level.md's four-level
+    -- comparison, where concept_*.html was byte-identical across all four
+    -- levels until this fix.
     CALL json_set("{}", "language", @language) INTO @_params_json
+    CALL json_set(@_params_json, "style", @style) INTO @_params_json
     CALL order_length(@domain_yaml) INTO @order_len
     CALL order_bullets(@domain_yaml) INTO @_order_bullets
 

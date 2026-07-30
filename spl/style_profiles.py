@@ -28,6 +28,41 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
         "length": "300–400 words per section",
         "structure": "Definition → Worked example → Key theorem → Lab cell (SymPy)",
     },
+    "core": {
+        "label": "Core (middle school through high school)",
+        "tone": "encouraging and exploratory; the student is starting to take the topic "
+                "seriously, not just hearing about it for the first time",
+        "depth": "go past the intro-level analogy into the concept's actual structure — "
+                 "introduce light formal notation only where the student is ready for it; "
+                 "no proofs. Close with one short, approachable practice problem (homework "
+                 "style) the student can actually attempt with what was just taught",
+        "audience": "middle-school to high-school student (grades 6–12) beginning to "
+                    "explore the topic beyond a first-pass intuition",
+        "length": "200–300 words per section",
+        "structure": "Recap the intuition briefly → Explore the idea's structure → "
+                     "Simple rule or pattern → Short practice problem (homework-style)",
+    },
+    "college": {
+        "label": "College course text (AP through undergraduate)",
+        "tone": "clear, precise, and applied — not artificially formal",
+        "depth": "go beyond conceptual understanding toward applying the concept to solve "
+                 "problems — the emphasis is problem-solving practice, not just definition. "
+                 "Introduce a formal theorem, proof, or heavy mathematical notation ONLY if "
+                 "the concept is intrinsically a mathematical/theoretical result that cannot "
+                 "be correctly understood without it (e.g. a limit, a matrix decomposition, "
+                 "a probability law). For concepts that are fundamentally practical — tools, "
+                 "protocols, systems, processes, software, ethical/legal frameworks — explain "
+                 "in plain, precise prose and demonstrate with code or a concrete scenario "
+                 "instead of inventing notation, algebraic formalism, or a 'theorem' the "
+                 "concept doesn't actually have",
+        "audience": "high-school AP student through undergraduate, with general "
+                    "quantitative literacy; not assumed to want or need notation for its "
+                    "own sake",
+        "length": "250–350 words per section",
+        "structure": "Definition → Worked example → Problem-solving application (add a "
+                     "formal theorem/proof step only when the concept genuinely requires "
+                     "one)",
+    },
     "feynman": {
         "label": "Feynman technique",
         "tone": "intuitive and story-driven; ask 'why does this feel right?' before formalising",
@@ -53,12 +88,43 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
         "structure": "Concept summary → Common mistakes → Teaching tip → Suggested exercise",
     },
     "research": {
-        "label": "Research / reference",
+        "label": "Research / project-driven (math, physics, engineering)",
         "tone": "dense and formal; theorem-proof style; citation-ready",
-        "depth": "full proof, connection to standard references, remarks on generality",
-        "audience": "graduate student or researcher who needs a precise, citable statement",
+        "depth": "frame the concept as an open research question, not a settled fact to "
+                 "recite. Full proof or derivation, connection to standard references and "
+                 "current literature, remarks on generality and open problems. Point toward "
+                 "a concrete project: what a graduate student would derive, replicate, or "
+                 "extend, and what a short experiment or investigation of it would involve",
+        "audience": "graduate student engaged in project-driven study — reads literature, "
+                    "runs experiments or derivations, writes up findings — not a passive "
+                    "reader of a settled reference entry",
         "length": "200–300 words per section",
-        "structure": "Definition → Theorem → Proof → Remark (connections / generalisations)",
+        "structure": "Definition → Theorem/Proof → Literature context (what's known, what's "
+                     "open) → Suggested investigation or experiment → Report-writing note "
+                     "(what a write-up of this investigation should establish)",
+    },
+    "research_applied": {
+        "label": "Research / project-driven (applied, non-mathematical domain)",
+        "tone": "dense, formal, and citation-ready — but never inventing mathematical or "
+                "proof notation for a concept that is not itself a mathematical result",
+        "depth": "frame the concept as an open question worth investigating, not a settled "
+                 "fact to recite. Precise technical definition, mechanism, and connection to "
+                 "current literature and practice, at graduate/professional rigor; formal "
+                 "theorem/proof notation ONLY if the concept genuinely is a mathematical or "
+                 "statistical result (e.g. a convergence guarantee, a complexity bound) — for "
+                 "concepts that are systems, protocols, regulations, biological mechanisms, "
+                 "or chemical processes, give the equivalent rigor in precise prose and, "
+                 "where relevant, code, not invented formalism. Point toward a concrete "
+                 "project: what a graduate student would investigate, measure, or build, and "
+                 "what an experiment or case study of it would involve",
+        "audience": "graduate student or professional in a technology, life-science, or "
+                    "applied field engaged in project-driven study — reads literature, runs "
+                    "experiments or case studies, writes up findings — not a passive reader "
+                    "of a settled reference entry",
+        "length": "200–300 words per section",
+        "structure": "Definition → Mechanism/process → Literature context (what's known, "
+                     "what's open) → Suggested investigation or experiment → Report-writing "
+                     "note (what a write-up of this investigation should establish)",
     },
     "middle_school": {
         "label": "Middle school (grades 6–8)",
