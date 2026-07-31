@@ -27,8 +27,15 @@ Usage examples:
     # Force-regenerate targets already in catalog.json (default is to skip them)
     python scripts/batch_generate.py --no-skip-existing
 
-    # Override level and LLM
+    # Only specific targets (concept IDs) across all/selected domains
+    python scripts/batch_generate.py --include data_science,dataset
+
+    # Skip specific targets
+    python scripts/batch_generate.py --exclude arima,hipaa
+
+    # Override level (single or comma-separated for multi-level runs)
     python scripts/batch_generate.py --level college --llm claude_cli:claude-opus-4-8
+    python scripts/batch_generate.py --level intro,core,college,research
 
     # Language accepts ISO codes or friendly names (case-insensitive)
     python scripts/batch_generate.py --language chinese
@@ -316,7 +323,8 @@ def _run_spl3(
 )
 @click.option(
     "--level", default=None,
-    help="Override content level (intro/core/college/research). Default: each domain's default_level.",
+    help="Comma-separated content level(s) to generate (intro/core/college/research). "
+         "Default: each domain's default_level. Multiple levels run all combinations.",
 )
 @click.option("--language", default="en", show_default=True, help="Output language code.")
 @click.option(
@@ -327,6 +335,14 @@ def _run_spl3(
     "--spl-dir", default=None, type=click.Path(path_type=Path),
     envvar="CB_SPL_DIR",
     help="Path to SPL.py project root. Default: ~/projects/digital-duck/SPL.py",
+)
+@click.option(
+    "--include", "include_targets", default=None,
+    help="Comma-separated target IDs to include (default: all). Applied after --n-targets.",
+)
+@click.option(
+    "--exclude", "exclude_targets", default=None,
+    help="Comma-separated target IDs to skip.",
 )
 @click.option("--skip-cache", is_flag=True, help="Pass skip_cache=yes to spl3.")
 @click.option(
@@ -346,6 +362,8 @@ def main(
     language: str,
     llm: str,
     spl_dir,
+    include_targets: str | None,
+    exclude_targets: str | None,
     skip_cache: bool,
     skip_existing: bool,
     dry_run: bool,
@@ -357,6 +375,13 @@ def main(
 
     model = _llm_to_model(llm)
     language = _resolve_lang(language)
+    include_set = {t.strip() for t in include_targets.split(",")} if include_targets else None
+    exclude_set = {t.strip() for t in exclude_targets.split(",")} if exclude_targets else set()
+    requested_levels = [l.strip() for l in level.split(",")] if level else None
+    if requested_levels:
+        unknown = [l for l in requested_levels if l not in _LEVEL_TO_STYLE]
+        if unknown:
+            click.echo(f"[warn] Unknown level(s): {', '.join(unknown)} (known: {', '.join(_LEVEL_TO_STYLE)})", err=True)
 
     catalog = _load_catalog()
     domain_map = {d["id"]: d for d in catalog}
@@ -368,20 +393,31 @@ def main(
             click.echo(f"[warn] Unknown domain(s): {', '.join(sorted(missing))}", err=True)
 
     jobs = []  # list of (domain_id, target, eff_level, style)
+    seen_targets: set[str] = set()
     for entry in targets_domains:
         did = entry["id"]
-        eff_level = level or entry.get("default_level", "college")
-        style = _resolve_style(eff_level, entry.get("tags", []))
+        levels_for_domain = requested_levels or [entry.get("default_level", "college")]
         app_ids = _get_application_ids(did)
         if not app_ids:
             click.echo(f"[skip] {did}: no application nodes in graph.yaml")
             continue
         selected = app_ids[:n_targets] if n_targets else app_ids
+        if include_set is not None:
+            selected = [t for t in selected if t in include_set]
+        selected = [t for t in selected if t not in exclude_set]
         for target in selected:
-            if skip_existing and _already_generated(entry, target, model, language, eff_level):
-                click.echo(f"[skip] {did}/{target} ({model}): already in catalog")
-                continue
-            jobs.append((did, target, eff_level, style))
+            seen_targets.add(target)
+            for eff_level in levels_for_domain:
+                style = _resolve_style(eff_level, entry.get("tags", []))
+                if skip_existing and _already_generated(entry, target, model, language, eff_level):
+                    click.echo(f"[skip] {did}/{target} level={eff_level} ({model}): already in catalog")
+                    continue
+                jobs.append((did, target, eff_level, style))
+
+    if include_set:
+        missing = include_set - seen_targets
+        if missing:
+            click.echo(f"[warn] --include targets not found in any domain: {', '.join(sorted(missing))}", err=True)
 
     if not jobs:
         click.echo("No jobs to run.")
