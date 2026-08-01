@@ -414,6 +414,16 @@ export function BookPage(container, params) {
 
   let isSrcdoc = false
 
+  const _onConceptClick = href => {
+    if (!href) return
+    if (href.startsWith('#')) {
+      try { frame.contentDocument?.querySelector(href)?.scrollIntoView({ behavior: 'smooth' }) } catch (_) {}
+      return
+    }
+    currentFile = currentFile.replace(/[^/]+\.html$/, href)
+    reload()
+  }
+
   frame.addEventListener('load', () => {
     if (isSrcdoc) return
     try {
@@ -426,21 +436,13 @@ export function BookPage(container, params) {
       }
     } catch (_) {}
     hideTocInFrame(frame)
-    _fillTocSection(navEl.tocSection, frame, {
-      onConceptClick: href => {
-        if (!href) return
-        if (href.startsWith('#')) {
-          try { frame.contentDocument?.querySelector(href)?.scrollIntoView({ behavior: 'smooth' }) } catch (_) {}
-          return
-        }
-        currentFile = currentFile.replace(/[^/]+\.html$/, href)
-        reload()
-      },
-    })
+    let hasToc = false
+    try { hasToc = !!frame.contentDocument?.querySelector('nav.toc') } catch (_) {}
+    if (!hasToc) return
+    _fillTocSection(navEl.tocSection, frame, { onConceptClick: _onConceptClick })
   })
 
   function reload() {
-    navEl.tocSection.innerHTML = '<div style="color:#90b4e8;font-size:11px;padding:4px 0">Loading…</div>'
     const url = buildUrl(domain, currentFile, p1.level, p1.lang, p1.model)
     _checkExists(url).then(exists => {
       isSrcdoc = !exists

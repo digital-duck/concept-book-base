@@ -20,13 +20,13 @@ than a domain-specific subset baked in at compile time.
 from __future__ import annotations
 
 STYLE_PROFILES: dict[str, dict[str, str]] = {
-    "textbook": {
-        "label": "University textbook",
-        "tone": "precise and formal",
-        "depth": "full definition, proof sketch, concrete worked example",
-        "audience": "first-year university student with calculus background",
-        "length": "300–400 words per section",
-        "structure": "Definition → Worked example → Key theorem → Lab cell (SymPy)",
+    "feynman": {
+        "label": "Feynman explains",
+        "tone": "intuitive and story-driven; ask 'why does this feel right?' before formalising",
+        "depth": "concept-first — build intuition, Introducing a concept using the Feynman technique by focusing on conceptual understanding, no math initially, definitely no formulae or formal proofs",
+        "audience": "beginner or elementary through middle-school students (grades 1–5)",
+        "length": "100–200 words per section",
+        "structure": "Motivating story → Intuition → Minimal formalisation → 'Now you try'",
     },
     "core": {
         "label": "Core (middle school through high school)",
@@ -41,6 +41,22 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
         "length": "200–300 words per section",
         "structure": "Recap the intuition briefly → Explore the idea's structure → "
                      "Simple rule or pattern → Short practice problem (homework-style)",
+    },
+    "middle_school": {
+        "label": "Middle school (grades 6–8)",
+        "tone": "warm and encouraging; define every new term in plain words the moment it appears",
+        "depth": "one idea at a time, concrete before abstract; heavy scaffolding, no formal proofs",
+        "audience": "11-14 year old comfortable with arithmetic and pre-algebra, no calculus",
+        "length": "150–250 words per section",
+        "structure": "Everyday example → Picture this (visual description) → Simple rule → Try it yourself",
+    },
+    "high_school": {
+        "label": "High school (grades 9–12)",
+        "tone": "clear and motivating; build toward formal reasoning without losing the reader along the way",
+        "depth": "definition, worked example, and a short 'why it's true' justification — first steps toward proof",
+        "audience": "14-18 year old with an algebra 1 background, preparing for standardized tests (SAT/ACT)",
+        "length": "250–350 words per section",
+        "structure": "Real-world hook → Definition → Worked example → Why it's true → Practice problem",
     },
     "college": {
         "label": "College course text (AP through undergraduate)",
@@ -58,34 +74,10 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
         "audience": "high-school AP student through undergraduate, with general "
                     "quantitative literacy; not assumed to want or need notation for its "
                     "own sake",
-        "length": "250–350 words per section",
+        "length": "300–400 words per section",
         "structure": "Definition → Worked example → Problem-solving application (add a "
                      "formal theorem/proof step only when the concept genuinely requires "
                      "one)",
-    },
-    "feynman": {
-        "label": "Feynman technique",
-        "tone": "intuitive and story-driven; ask 'why does this feel right?' before formalising",
-        "depth": "concept-first — build intuition, then let the algebra follow inevitably",
-        "audience": "curious person comfortable with high-school algebra; no prior university math",
-        "length": "200–300 words per section",
-        "structure": "Motivating story → Intuition → Minimal formalisation → 'Now you try'",
-    },
-    "flashcard": {
-        "label": "Anki flashcard set",
-        "tone": "terse, precise, exam-ready",
-        "depth": "one fact per card; no proofs, just the statement and one example",
-        "audience": "student reviewing the night before an exam",
-        "length": "50–100 words per section (one Q&A pair per key fact)",
-        "structure": "Q: [precise question]  A: [minimal complete answer]  Example: [one line]",
-    },
-    "instructor": {
-        "label": "Instructor teaching notes",
-        "tone": "pedagogical; explicitly name common misconceptions and how to counter them",
-        "depth": "concept summary + typical student errors + suggested in-class exercise",
-        "audience": "instructor preparing a lecture or recitation",
-        "length": "400–500 words per section",
-        "structure": "Concept summary → Common mistakes → Teaching tip → Suggested exercise",
     },
     "research": {
         "label": "Research / project-driven (math, physics, engineering)",
@@ -98,7 +90,7 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
         "audience": "graduate student engaged in project-driven study — reads literature, "
                     "runs experiments or derivations, writes up findings — not a passive "
                     "reader of a settled reference entry",
-        "length": "200–300 words per section",
+        "length": "350–600 words per section",
         "structure": "Definition → Theorem/Proof → Literature context (what's known, what's "
                      "open) → Suggested investigation or experiment → Report-writing note "
                      "(what a write-up of this investigation should establish)",
@@ -118,29 +110,37 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
                  "project: what a graduate student would investigate, measure, or build, and "
                  "what an experiment or case study of it would involve",
         "audience": "graduate student or professional in a technology, life-science, or "
-                    "applied field engaged in project-driven study — reads literature, runs "
-                    "experiments or case studies, writes up findings — not a passive reader "
+                    "applied field engaged in project-driven study — reads literature, build project, "
+                    "runs experiments or case studies, writes up findings — not a passive reader "
                     "of a settled reference entry",
-        "length": "200–300 words per section",
+        "length": "350–600 words per section",
         "structure": "Definition → Mechanism/process → Literature context (what's known, "
                      "what's open) → Suggested investigation or experiment → Report-writing "
                      "note (what a write-up of this investigation should establish)",
     },
-    "middle_school": {
-        "label": "Middle school (grades 6–8)",
-        "tone": "warm and encouraging; define every new term in plain words the moment it appears",
-        "depth": "one idea at a time, concrete before abstract; heavy scaffolding, no formal proofs",
-        "audience": "11-14 year old comfortable with arithmetic and pre-algebra, no calculus",
-        "length": "150–250 words per section",
-        "structure": "Everyday example → Picture this (visual description) → Simple rule → Try it yourself",
+    "textbook": {
+        "label": "University textbook",
+        "tone": "precise and formal",
+        "depth": "full definition, proof sketch, concrete worked example",
+        "audience": "first-year university student with calculus background",
+        "length": "200–400 words per section",
+        "structure": "Definition → Worked example → Key theorem → Lab cell (SymPy)",
     },
-    "high_school": {
-        "label": "High school (grades 9–12)",
-        "tone": "clear and motivating; build toward formal reasoning without losing the reader along the way",
-        "depth": "definition, worked example, and a short 'why it's true' justification — first steps toward proof",
-        "audience": "14-18 year old with an algebra 1 background, preparing for standardized tests (SAT/ACT)",
-        "length": "250–350 words per section",
-        "structure": "Real-world hook → Definition → Worked example → Why it's true → Practice problem",
+    "flashcard": {
+        "label": "Anki flashcard set",
+        "tone": "terse, precise, exam-ready",
+        "depth": "one fact per card; no proofs, just the statement and one example",
+        "audience": "student reviewing the night before an exam",
+        "length": "50–100 words per section (one Q&A pair per key fact)",
+        "structure": "Q: [precise question]  A: [minimal complete answer]  Example: [one line]",
+    },
+    "instructor": {
+        "label": "Instructor teaching notes",
+        "tone": "pedagogical; explicitly name common misconceptions and how to counter them",
+        "depth": "concept summary + typical student errors + suggested in-class exercise",
+        "audience": "instructor preparing a lecture or recitation",
+        "length": "300–500 words per section",
+        "structure": "Concept summary → Common mistakes → Teaching tip → Suggested exercise",
     },
 }
 
