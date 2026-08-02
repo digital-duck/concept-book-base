@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     spl_while_max_iter: int = 50
     spl_max_llm_calls: int = 50
 
-    model_config = {"env_prefix": "CB_", "env_file": ".env"}
+    model_config = {"env_prefix": "CB_", "env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

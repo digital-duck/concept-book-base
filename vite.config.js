@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs'
 import path from 'node:path'
 
 // GitHub Pages serves each repo at https://<org>.github.io/<repo-name>/, so
@@ -10,11 +11,29 @@ import path from 'node:path'
 // the one thing that CAN'T be auto-derived: package.json's "name" field).
 const repoName = path.basename(path.dirname(fileURLToPath(import.meta.url)))
 
+function readDotEnv() {
+  try {
+    return Object.fromEntries(
+      fs.readFileSync(new URL('.env', import.meta.url).pathname, 'utf8')
+        .split('\n')
+        .filter(l => l.trim() && !l.startsWith('#'))
+        .map(l => l.split('=', 2))
+        .filter(p => p.length === 2)
+        .map(([k, v]) => [k.trim(), v.trim()])
+    )
+  } catch { return {} }
+}
+
+const localEnv = readDotEnv()
+const API_PORT = localEnv.API_PORT || process.env.API_PORT || '8200'
+const DEV_PORT = parseInt(localEnv.DEV_PORT || process.env.DEV_PORT || '5173', 10)
+
 export default defineConfig({
   base: `/${repoName}/`,
   server: {
+    port: DEV_PORT,
     proxy: {
-      '/api': 'http://localhost:8200',
+      '/api': `http://localhost:${API_PORT}`,
     },
   },
 })
