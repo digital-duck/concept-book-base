@@ -120,8 +120,19 @@ def order_bullets(domain_yaml: str) -> str:
 
 @spl_tool
 def apps_list(domain_yaml: str) -> str:
-    """Return applications of the target concept as a comma-separated string."""
-    return ", ".join(_domain(domain_yaml)["apps"])
+    """Return applications of the target concept as comma-separated labels ("none" if empty).
+
+    Labels, not ids: this feeds write_payoff's prompt, and ids there get
+    echoed verbatim into the generated prose.
+    """
+    return ", ".join(concept_label(a) for a in _domain(domain_yaml)["apps"]) or "none"
+
+
+@spl_tool
+def prereq_labels(domain_yaml: str, concept: str) -> str:
+    """Return the concept's direct prerequisites as comma-separated labels ("none" if empty)."""
+    graph = _domain(domain_yaml)["graph"]
+    return ", ".join(concept_label(p) for p in sorted(graph.predecessors(concept))) or "none"
 
 
 @spl_tool
@@ -568,7 +579,9 @@ footer.spl-credit .spl-credit__meta{margin-bottom:4px}"""
 _MATHJAX_HEAD = """\
 <script>
 MathJax = {
-  tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']], displayMath: [['$$','$$'],['\\\\[','\\\\]']] },
+  loader: { load: ['[tex]/mathtools'] },
+  tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']], displayMath: [['$$','$$'],['\\\\[','\\\\]']],
+         packages: { '[+]': ['mathtools'] } },
   options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
 };
 </script>

@@ -40,7 +40,8 @@ STYLE_PROFILES: dict[str, dict[str, str]] = {
                     "explore the topic beyond a first-pass intuition",
         "length": "200–300 words per section",
         "structure": "Recap the intuition briefly → Explore the idea's structure → "
-                     "Simple rule or pattern → Short practice problem (homework-style)",
+                     "Simple rule or pattern (in words; as a formula only if the subject "
+                     "has a real one) → Short practice problem (homework-style)",
     },
     "middle_school": {
         "label": "Middle school (grades 6–8)",
@@ -168,6 +169,18 @@ SUBJECT_RIGOR: dict[str, str] = {
         "formulas, or quantitative formalism; explain using the subject's own "
         "native tools instead — examples, structure, rules, and context."
     ),
+    "health": (
+        "This is an applied health subject (physiology, nutrition, exercise, "
+        "traditional medicine such as TCM). Use real quantities and "
+        "established formulas only where the field genuinely uses them — "
+        "energy in kcal, heart rate, cardiac output, blood glucose, times, "
+        "doses. Never express qualitative or traditional-medicine ideas "
+        "(qi, yin-yang, the Five Phases, emotions, balance, harmony) as "
+        "equations, proportionalities, or logic formulas; explain them in "
+        "words, tables, and concrete examples. Present traditional claims "
+        "as traditional, and say plainly when a claim is not established by "
+        "scientific evidence."
+    ),
 }
 
 # Substring keywords used to classify a domain_id into a SUBJECT_RIGOR tier.
@@ -176,6 +189,7 @@ SUBJECT_RIGOR: dict[str, str] = {
 # behavior (no subject-rigor note beyond what the level profile already says).
 _RIGOR_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("moderate", ("chemistry", "biology", "molecular", "medicine", "medic")),
+    ("health", ("health", "nutrition", "wellness", "fitness", "tcm", "qigong")),
     ("minimal", ("chinese", "english", "language", "music", "arts", "poetry",
                  "character", "literat")),
 )

@@ -87,6 +87,22 @@ college_physics_ch4
 | `--progress-file` | `scripts/batch_gen_domains_progress.json` | Resume tracking, keyed `domain\|model\|level\|lang` |
 | `--log-file` | none | Also write output to this file (in addition to stdout) |
 
+Behavior worth knowing (fixed 2026-09-24, ported from cb-meta-health):
+- **Level → style.** `--level` is mapped to the workflow's `@style` through
+  `level_style.resolve_style(level, catalog tags)`, the same as the web UI and
+  `batch_generate.py`. Previously only `lvl=` was passed, which `build_concept_book.spl`
+  ignores, so every book was generated at the default `textbook` style. Check that the
+  `Queue` line shows the expected `style=`.
+- **spl3 safety caps.** spl3's built-in limits (15 loop iterations, 25 LLM calls, 100k tokens)
+  are too small for a normal chapter. The subprocess now defaults to `SPL_WHILE_MAX_ITER=60`,
+  `SPL_MAX_LLM_CALLS=120` and `SPL_MAX_TOTAL_TOKENS=600000`; values exported in the shell win.
+- **Non-English output.** The script looks for `book_{target}_{lang}.html` for non-English
+  languages (English stays unsuffixed), matching `spl/tools.py`. Previously every non-English
+  run was reported as failed even though the book had been written.
+- **Existing output isn't registered.** When a book already exists on disk, the script marks
+  it `done` in the progress file but does not update `catalog.json`; use `--force` to
+  regenerate (fast from the cache) and register it.
+
 **Test one domain first, then run the full list:**
 ```bash
 conda activate spl123
@@ -116,7 +132,7 @@ python scripts/batch_gen_domains.py -f scripts/domains-college-physics.txt \
 
 ## Cache behaviour
 
-The spl3 content cache key is `(concept, language, llm)`.
+The spl3 content cache key is `(concept, language, style, llm)`, so the same concept at a different level (style) is a separate cache entry. The style *name* is in the key, not the prompt text, so after a prompt or style-profile change, add `--skip-cache` to regenerate.
 
 - Same concept in **different languages** → separate cache entries (independent)
 - Same concept with **different LLM** → separate cache entries (good for quality comparison)

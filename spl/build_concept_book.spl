@@ -51,7 +51,20 @@ each part should contain — they are English labels for your reference only,
 not text to copy verbatim. Write every word of the output, including any
 structural headers, entirely in {language}.
 Use LaTeX for all mathematics and notation; mathematical notation and LaTeX
-remain in their standard form regardless of language.
+remain in their standard form regardless of language. Always wrap LaTeX in
+its math delimiters — a single dollar sign on each side for inline math, a
+double dollar sign on its own line before and after for a display equation
+— never leave a bare LaTeX command with no surrounding delimiters: MathJax
+only renders delimited math, so an undelimited LaTeX command (e.g. a bare
+\underbrace with nothing wrapped around it) shows up as broken raw text
+instead of a rendered equation.
+Write an equation only when it states a real, established relationship of
+the subject (a law, a definition, a standard formula, a measured quantity) —
+never invent a formula, proportionality, or logical expression to dress up a
+qualitative idea; state such ideas in words. Every equation must be complete,
+valid LaTeX: balanced braces, and every fraction written as \frac{...}{...}.
+Refer to concepts by their natural-language names in {language}; never write
+identifiers containing underscores in the prose.
 Output only the section text. No preamble, no metadata.
 $$;
 
@@ -67,6 +80,12 @@ style described below throughout the revision.
 The STRUCTURE labels in the STYLE GUIDE above are English labels for
 reference only, not text to copy verbatim. Write every word of the revision,
 including any structural headers, entirely in {language}.
+If the section below contains any LaTeX wrapped in math delimiters (a
+single dollar sign on each side for inline math, a double dollar sign for
+a display equation), preserve it — including those delimiters — exactly
+as mathematical notation; never drop the delimiters or convert the LaTeX
+into a plain-text description of the equation. A bare, undelimited LaTeX
+command left in the output renders as broken raw text, not a formula.
 
 SECTION:
 {section}
@@ -77,7 +96,7 @@ FEEDBACK:
 Output the revised section only. No preamble. No commentary.
 $$;
 
-CREATE FUNCTION write_payoff(target TEXT, applications TEXT, style_guide TEXT, language TEXT)
+CREATE FUNCTION write_payoff(target TEXT, target_context TEXT, prerequisites TEXT, applications TEXT, style_guide TEXT, language TEXT)
 RETURN TEXT
 AS $$
 You are an expert author writing the capstone of a concept-book.
@@ -85,19 +104,33 @@ You are an expert author writing the capstone of a concept-book.
 {style_guide}
 
 The textbook culminates in the concept: {target}
-Applications this concept unlocks: {applications}
+What it is: {target_context}
+Concepts it directly builds on: {prerequisites}
+Further applications this concept unlocks: {applications}
 
 Write a "Payoff" section that:
-1. Explains what {target} achieves and why it is the natural endpoint.
-2. Shows how it connects to each listed application domain.
-3. Ends with an invitation to explore one application in depth.
+1. Explains what {target} achieves and why it is the natural endpoint,
+   staying faithful to "What it is" above — do not reinterpret the concept
+   from its name alone.
+2. Shows how the concepts it builds on come together in it, and how it
+   connects to each listed application (if none are listed, connect it to
+   the real-world use described in "What it is" instead).
+3. Ends with an invitation to put it into practice or explore it further.
 
 Begin with: ## Payoff
 
 Follow the length and structure in the STYLE GUIDE above; any English
 structure labels there describe the content only, not text to copy verbatim.
-Use LaTeX for mathematics and notation. Write every word of the output,
-including any structural headers, entirely in {language}.
+Use LaTeX for mathematics and notation, always wrapped in its math
+delimiters (a single dollar sign on each side for inline math, a double
+dollar sign for a display equation) — MathJax only renders delimited
+LaTeX; a bare, undelimited LaTeX command renders as broken raw text. Write an
+equation only when it states a real, established relationship of the
+subject — never invent a formula to dress up a qualitative idea — and make
+every equation complete, valid LaTeX. Refer to every concept by its
+natural-language name in {language}; never write identifiers containing
+underscores. Write every word of the output, including any structural
+headers, entirely in {language}.
 Output only the section. No preamble.
 $$;
 
@@ -259,6 +292,14 @@ DO
             -- concept key ("{target}__payoff") keeps it from colliding with
             -- the target's own section cache entry.
             CALL apps_list(@domain_yaml) INTO @apps
+            -- The payoff needs the target's own definition: an application
+            -- capstone has no downstream applications, so without it the
+            -- prompt carries nothing but the bare id and the model guesses
+            -- the concept from its name (e.g. "meta_health" read as
+            -- "metabolic health").
+            CALL concept_label(@target) INTO @_target_label
+            CALL concept_context(@domain_yaml, @target) INTO @_target_context
+            CALL prereq_labels(@domain_yaml, @target) INTO @_target_prereqs
             @_payoff_key := @target + "__payoff"
 
             EVALUATE @skip_cache
@@ -271,7 +312,7 @@ DO
             EVALUATE @capstone
                 WHEN = "miss" THEN
                     LOGGING f"cache MISS for {@_payoff_key} — generating with the LLM" LEVEL INFO
-                    GENERATE write_payoff(@target, @apps, @style_guide, @language_label) INTO @capstone
+                    GENERATE write_payoff(@_target_label, @_target_context, @_target_prereqs, @apps, @style_guide, @language_label) INTO @capstone
                     CALL cache_put(@_payoff_key, @capstone, params_json=@_params_json) INTO @_cache_key
                     LOGGING f"Stored verified payoff — cache key {@_cache_key}" LEVEL INFO
                 ELSE

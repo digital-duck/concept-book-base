@@ -25,6 +25,7 @@ Usage:
 """
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -36,6 +37,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from batch_generate import _llm_to_model, _mark_generated, _resolve_lang  # noqa: E402
+from level_style import resolve_style  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SPL_WORKFLOW = REPO_ROOT / "spl"
@@ -70,6 +72,19 @@ _LLM_ALIASES: dict[str, str] = {
 _RATE_LIMIT_MARKERS = ("ModelOverloaded", "Claude CLI limit reached")
 
 
+# spl3's built-in safety caps (15 WHILE iterations, 25 LLM calls, 100k tokens)
+# are sized for small demos: build_concept_book.spl's section loop iterates
+# once per concept and can make up to 3 LLM calls per concept (write + two
+# conditional refines), so a 25-node chapter blows through all three. The web
+# UI raises them via .env's CB_SPL_* settings; an unattended batch run gets
+# these defaults instead. Values already exported in the shell win.
+_SPL_CAP_DEFAULTS = {
+    "SPL_WHILE_MAX_ITER": "60",
+    "SPL_MAX_LLM_CALLS": "120",
+    "SPL_MAX_TOTAL_TOKENS": "600000",
+}
+
+
 def _resolve_llm(model: str) -> str:
     return _LLM_ALIASES.get(model, model)
 
@@ -97,8 +112,22 @@ def _capstone(domain_id: str) -> str | None:
     return max(concepts, key=lambda k: concepts[k].get("tier", 0))
 
 
+def _domain_tags(domain_id: str) -> list[str]:
+    catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8")) if CATALOG_PATH.exists() else []
+    entry = next((d for d in catalog if d.get("id") == domain_id), {})
+    return entry.get("tags", [])
+
+
+def _book_filename(target: str, language: str) -> str:
+    # spl/tools.py's build_book_index suffixes the filename with "_{language}"
+    # for every language except English — match it, or every non-English run
+    # is reported as failed even though the book was written.
+    suffix = f"_{language}" if language and language != "en" else ""
+    return f"book_{target}{suffix}.html"
+
+
 def _output_exists(domain_id: str, target: str, level: str, language: str, model: str) -> bool:
-    path = DOMAINS_DIR / domain_id / "output" / f"{level}.{language}" / model / "html" / f"book_{target}.html"
+    path = DOMAINS_DIR / domain_id / "output" / f"{level}.{language}" / model / "html" / _book_filename(target, language)
     return path.exists() and path.stat().st_size > 500
 
 
@@ -123,7 +152,7 @@ _TRACEBACK_START = "Traceback (most recent call last):"
 _RATE_LIMIT_DETAIL_RE = re.compile(r"Claude CLI limit reached:\s*(.+)")
 
 
-def _run_spl3(domain_id: str, target: str, level: str, language: str, model: str,
+def _run_spl3(domain_id: str, target: str, level: str, style: str, language: str, model: str,
               llm: str, skip_cache: bool, log: logging.Logger,
               domain_yaml_dir: Path | None = None) -> tuple[bool, str | None]:
     """Run spl3, streaming output live (minus tracebacks) while capturing it in full.
@@ -157,14 +186,19 @@ def _run_spl3(domain_id: str, target: str, level: str, language: str, model: str
         "--param", f"domain_yaml={domain_yaml_path}",
         "--param", f"target={target}",
         "--param", f"lvl={level}",
+        # build_concept_book.spl has no @lvl input — @style is what actually
+        # sets depth/rigor (see scripts/level_style.py); without it every
+        # book silently generates at the workflow's default 'textbook' style.
+        "--param", f"style={style}",
         "--param", f"language={language}",
         "--param", f"output_dir={output_dir}",
         "--param", f"skip_cache={'yes' if skip_cache else 'no'}",
         "--param", f"llm={llm}",
     ]
 
+    env = {**_SPL_CAP_DEFAULTS, **os.environ}
     proc = subprocess.Popen(cmd, cwd=str(SPL_WORKFLOW), stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, text=True)
+                             stderr=subprocess.STDOUT, text=True, env=env)
     assert proc.stdout is not None
     lines: list[str] = []
     suppressing = False
@@ -186,7 +220,7 @@ def _run_spl3(domain_id: str, target: str, level: str, language: str, model: str
     if proc.returncode != 0:
         return False, f"spl3 exited {proc.returncode}"
 
-    out_file = output_dir / f"book_{target}.html"
+    out_file = output_dir / _book_filename(target, language)
     if not out_file.exists() or out_file.stat().st_size < 500:
         return False, f"spl3 exited 0 but {out_file.name} was not written (likely a caught exception)"
 
@@ -262,9 +296,10 @@ def main(domains_file: Path, model: str, level: str, language: str, skip_cache: 
             skipped += 1
             continue
 
-        log.info(f"Queue  {domain_id}  target={target}")
+        style = resolve_style(level, _domain_tags(domain_id))
+        log.info(f"Queue  {domain_id}  target={target}  style={style}")
         t0 = time.time()
-        success, err = _run_spl3(domain_id, target, level, language, model_dir, llm, skip_cache, log,
+        success, err = _run_spl3(domain_id, target, level, style, language, model_dir, llm, skip_cache, log,
                                   domain_yaml_dir=domain_yaml_dir)
         elapsed = time.time() - t0
 
