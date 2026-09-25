@@ -280,9 +280,13 @@ def _to_html(graph: nx.DiGraph, domain_name: str = "") -> str:
         }
         color = color_map.get(kind, color_map["concept"])
         prereqs = attrs.get("composed_of") or attrs.get("needs") or []
+        labels = attrs.get("labels") or {}
         nodes_data.append({
             "id":      node,
-            "label":   node.replace("_", " "),
+            # English display label; `labels` carries every language so the
+            # host app can relabel in place (graph.html stays language-invariant).
+            "label":   labels.get("en") or node.replace("_", " "),
+            "labels":  labels,
             "kind":    kind,
             "tier":    tier,
             "defines": attrs.get("defines", ""),
@@ -574,10 +578,27 @@ function topoSort(nodeSet) {{
 }}
 
 // ── vis.js network ──────────────────────────────────────────────────────────
+// Wrap a label for a node box: Latin text breaks on spaces into ~14-char
+// lines; CJK text (no spaces) breaks every 6 characters.
+function wrapLabel(text) {{
+  const words = String(text).split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {{
+    if (line && (line + ' ' + w).length > 14) {{ lines.push(line); line = w; }}
+    else line = line ? line + ' ' + w : w;
+  }}
+  if (line) lines.push(line);
+  return lines
+    .flatMap(l => /[\\u3040-\\u30ff\\u3400-\\u9fff\\uac00-\\ud7af]/.test(l) && !l.includes(' ') && l.length > 6
+      ? l.match(/.{{1,6}}/gu) : [l])
+    .join('\\n');
+}}
+
 const container = document.getElementById('graph-container');
 const visNodes = new vis.DataSet(RAW.nodes.map(n => ({{
   id: n.id,
-  label: n.label.replace(/ /g, '\\n'),
+  label: wrapLabel(n.label),
   level: bfsLevels[n.id] !== undefined ? bfsLevels[n.id] : n.tier,
   color: n.color,
   font: n.font,
@@ -929,6 +950,7 @@ def _load_yaml_graph(path: Path) -> nx.DiGraph:
                 lab=attrs.get("lab", ""),
                 play=attrs.get("play", ""),
                 domain=attrs.get("domain", ""),
+                labels=attrs.get("labels") or {},
             )
             for prereq in prereqs:
                 g.add_edge(prereq, name)

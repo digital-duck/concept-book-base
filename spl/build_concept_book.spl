@@ -218,15 +218,19 @@ DO
         -- LLM call by treating the lookup as a miss outright — the section
         -- is still cache_put below, so the refreshed content becomes the
         -- new cached entry for future non-skip runs.
+        -- The key also carries a hash of the concept's `defines` (@_sec_params):
+        -- a concept re-declared in another chapter with a different definition
+        -- gets its own entry instead of sharing (and overwriting) one slot.
+        CALL localized_label(@domain_yaml, @concept, @language) INTO @_label
+        CALL concept_context(@domain_yaml, @concept) INTO @_context
+        CALL section_params(@_params_json, @_context) INTO @_sec_params
         EVALUATE @skip_cache
             WHEN = "yes" THEN
                 LOGGING f"skip_cache=yes — forcing regeneration for {@concept}" LEVEL INFO
                 @section := "miss"
             ELSE
-                CALL cache_get(@concept, params_json=@_params_json) INTO @section
+                CALL cache_get(@concept, params_json=@_sec_params) INTO @section
         END
-        CALL concept_label(@concept) INTO @_label
-        CALL concept_context(@domain_yaml, @concept) INTO @_context
         EVALUATE @section
             WHEN = "miss" THEN
                 LOGGING f"cache MISS for {@concept} — generating with the LLM" LEVEL INFO
@@ -252,7 +256,7 @@ DO
                         LOGGING "Content verified" LEVEL INFO
                 END
 
-                CALL cache_put(@concept, @section, params_json=@_params_json) INTO @cache_key
+                CALL cache_put(@concept, @section, params_json=@_sec_params) INTO @cache_key
                 LOGGING f"Stored verified section — cache key {@cache_key}" LEVEL INFO
             ELSE
                 LOGGING f"cache HIT for {@concept} — reusing verified section (0 LLM calls)" LEVEL INFO
@@ -291,15 +295,16 @@ DO
             -- Cached the same way as sections (Layer 2) — a distinct
             -- concept key ("{target}__payoff") keeps it from colliding with
             -- the target's own section cache entry.
-            CALL apps_list(@domain_yaml) INTO @apps
+            CALL apps_list(@domain_yaml, @language) INTO @apps
             -- The payoff needs the target's own definition: an application
             -- capstone has no downstream applications, so without it the
             -- prompt carries nothing but the bare id and the model guesses
             -- the concept from its name (e.g. "meta_health" read as
             -- "metabolic health").
-            CALL concept_label(@target) INTO @_target_label
+            CALL localized_label(@domain_yaml, @target, @language) INTO @_target_label
             CALL concept_context(@domain_yaml, @target) INTO @_target_context
-            CALL prereq_labels(@domain_yaml, @target) INTO @_target_prereqs
+            CALL prereq_labels(@domain_yaml, @target, @language) INTO @_target_prereqs
+            CALL section_params(@_params_json, @_target_context) INTO @_payoff_params
             @_payoff_key := @target + "__payoff"
 
             EVALUATE @skip_cache
@@ -307,13 +312,13 @@ DO
                     LOGGING f"skip_cache=yes — forcing regeneration for {@_payoff_key}" LEVEL INFO
                     @capstone := "miss"
                 ELSE
-                    CALL cache_get(@_payoff_key, params_json=@_params_json) INTO @capstone
+                    CALL cache_get(@_payoff_key, params_json=@_payoff_params) INTO @capstone
             END
             EVALUATE @capstone
                 WHEN = "miss" THEN
                     LOGGING f"cache MISS for {@_payoff_key} — generating with the LLM" LEVEL INFO
                     GENERATE write_payoff(@_target_label, @_target_context, @_target_prereqs, @apps, @style_guide, @language_label) INTO @capstone
-                    CALL cache_put(@_payoff_key, @capstone, params_json=@_params_json) INTO @_cache_key
+                    CALL cache_put(@_payoff_key, @capstone, params_json=@_payoff_params) INTO @_cache_key
                     LOGGING f"Stored verified payoff — cache key {@_cache_key}" LEVEL INFO
                 ELSE
                     LOGGING f"cache HIT for {@_payoff_key} — reusing verified payoff (0 LLM calls)" LEVEL INFO

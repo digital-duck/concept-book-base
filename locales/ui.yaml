@@ -1,0 +1,408 @@
+# UI strings for the app shell and the fixed text of generated book pages.
+# Shape: key → {lang: text}. Nested keys are flattened to dotted keys on load
+# (panel.generate → t('panel.generate')). Missing languages fall back to `en`.
+#
+# Read by: src/i18n.js (bundled at build time via @rollup/plugin-yaml) and
+# spl/tools.py (the book.* keys). See docs/DEV/readme-i18n.md §2a.
+#
+# YAML pitfalls: quote values that start with { [ : @, and quote language
+# codes that YAML 1.1 reads as booleans (no, yes, on, off).
+
+_meta:
+  source: en
+  # The top-bar language picker lists these, in this order.
+  # status: source | reviewed | machine (LLM-drafted, not yet reviewed).
+  languages:
+    en:
+      name: English
+      status: source
+    zh:
+      name: 中文
+      status: reviewed
+
+app:
+  title:
+    en: ConceptBook
+    zh: 概念书
+  tagline:
+    en: Explore knowledge through concept graphs
+    zh: 通过概念图探索知识
+
+nav:
+  about:
+    en: About
+    zh: 关于
+  settings:
+    en: Settings
+    zh: 设置
+  language:
+    en: Language (interface and content)
+    zh: 语言（界面与内容）
+
+loading:
+  en: Loading…
+  zh: 加载中…
+
+home:
+  load_error:
+    en: Could not load domains. {error}
+    zh: 无法加载领域列表。{error}
+  filter:
+    subject:
+      en: Subject
+      zh: 主题
+    level:
+      en: Level
+      zh: 级别
+    all:
+      en: All
+      zh: 全部
+
+# Domain tag chips/filters (catalog.json `tags`). Tags without an entry show
+# as-is; a derived app lists its own tags here (like app.title, it's per app).
+tag: {}
+  # Add one entry per tag your catalog uses, e.g.
+  #   math:
+  #     en: math
+  #     zh: 数学
+
+level:
+  intro:
+    en: Intro
+    zh: 入门
+  core:
+    en: Core
+    zh: 核心
+  college:
+    en: College
+    zh: 大学
+  research:
+    en: Research
+    zh: 研究
+
+card:
+  stats:
+    en: '{nodes} nodes · {edges} edges · {primitives} primitives'
+    zh: '{nodes} 个节点 · {edges} 条边 · {primitives} 个基础概念'
+  explore:
+    en: Explore Concept-Graph
+    zh: 探索概念图
+  book_available:
+    en: Book available
+    zh: 已有概念书
+
+domain:
+  label:
+    en: Domain
+    zh: 领域
+  select:
+    en: Select domain…
+    zh: 选择领域…
+  load:
+    en: Load
+    zh: 载入
+  source:
+    en: 'Source: {link} by {authors} ({license}).'
+    zh: 来源：{link}，作者 {authors}（{license}）。
+  drag_resize:
+    en: Drag to resize
+    zh: 拖动调整大小
+
+graph:
+  search_placeholder:
+    en: Search node…
+    zh: 搜索节点…
+  search:
+    en: Search
+    zh: 搜索
+  zoom_out:
+    en: Zoom −
+    zh: 缩小
+  zoom_out_title:
+    en: Zoom out
+    zh: 缩小
+  zoom_in:
+    en: Zoom +
+    zh: 放大
+  zoom_in_title:
+    en: Zoom in
+    zh: 放大
+  recenter:
+    en: Re-Center
+    zh: 居中
+  frame_title:
+    en: '{domain} concept graph'
+    zh: '{domain} 概念图'
+  # Notes drawer (inside graph.html; set from the parent by GraphViewer.js)
+  notes:
+    en: Notes
+    zh: 笔记
+  notes_clear:
+    en: Clear
+    zh: 清空
+  notes_export:
+    en: Export
+    zh: 导出
+  notes_placeholder:
+    en: "Type notes here\n(auto-saved per node)"
+    zh: "在此输入笔记\n（按节点自动保存）"
+  notes_none:
+    en: no node selected
+    zh: 未选择节点
+
+panel:
+  model:
+    en: Model
+    zh: 模型
+  level:
+    en: Level
+    zh: 级别
+  language:
+    en: Content language
+    zh: 内容语言
+  refresh:
+    en: Refresh — re-check for content that just finished generating
+    zh: 刷新——重新检查刚生成完成的内容
+  generate:
+    en: Generate
+    zh: 生成
+  generating:
+    en: Generating…
+    zh: 生成中…
+  retry:
+    en: Retry
+    zh: 重试
+  skip_cache:
+    en: Skip cache
+    zh: 跳过缓存
+  export_pdf:
+    en: Export PDF
+    zh: 导出 PDF
+  exporting:
+    en: Exporting…
+    zh: 导出中…
+  exported:
+    en: Export PDF ✓
+    zh: 导出 PDF ✓
+  export_error:
+    en: Error
+    zh: 出错
+  copy:
+    en: Copy
+    zh: 复制
+  copied:
+    en: Copied!
+    zh: 已复制！
+  hint_click:
+    en: Click any node in the graph to see its details.
+    zh: 点击图中任意节点查看详情。
+  no_path:
+    en: No concepts found on this path.
+    zh: 此路径上没有找到概念。
+  # {requested}/{shown} are language names from `langname` below.
+  fallback_notice:
+    en: '{requested} not yet generated — showing {shown}'
+    zh: '{requested}版尚未生成，正在显示{shown}版'
+  generate_in:
+    en: Generate {lang}
+    zh: 生成{lang}版
+  missing:
+    en: ⚠️ Missing content for model=<strong>{model}</strong>, level=<strong>{level}</strong>, language=<strong>{lang}</strong>. Click <strong>Generate</strong> to create it.
+    zh: ⚠️ 尚无内容：模型=<strong>{model}</strong>，级别=<strong>{level}</strong>，语言=<strong>{lang}</strong>。点击<strong>生成</strong>创建。
+  log_done:
+    en: ✓ Done
+    zh: ✓ 完成
+  log_dropped:
+    en: "✗ Connection to the API dropped or is unreachable.\n  Check the API terminal for errors, or run: bash scripts/start-api.sh"
+    zh: "✗ 与 API 的连接中断或无法访问。\n  请检查 API 终端的错误信息，或运行：bash scripts/start-api.sh"
+
+# Language names, as shown inside UI sentences (panel.fallback_notice).
+langname:
+  en:
+    en: English
+    zh: 英文
+  zh:
+    en: Chinese
+    zh: 中文
+  es:
+    en: Spanish
+    zh: 西班牙文
+  fr:
+    en: French
+    zh: 法文
+  de:
+    en: German
+    zh: 德文
+  ja:
+    en: Japanese
+    zh: 日文
+  ko:
+    en: Korean
+    zh: 韩文
+  pt:
+    en: Portuguese
+    zh: 葡萄牙文
+  ru:
+    en: Russian
+    zh: 俄文
+  ar:
+    en: Arabic
+    zh: 阿拉伯文
+  hi:
+    en: Hindi
+    zh: 印地文
+
+settings:
+  title:
+    en: Settings
+    zh: 设置
+  llm_section:
+    en: SPL Adapter and Model Configuration
+    zh: SPL 适配器与模型配置
+  adapter:
+    en: Adapter
+    zh: 适配器
+  model:
+    en: Model
+    zh: 模型
+  api_key:
+    en: API Key
+    zh: API 密钥
+  api_key_placeholder:
+    en: Enter your API key
+    zh: 输入你的 API 密钥
+  key_saved:
+    en: A key is already saved — enter a new one to replace it, or leave blank to keep it.
+    zh: 已保存一个密钥——输入新密钥可替换，留空则保留原密钥。
+  save:
+    en: Save
+    zh: 保存
+  current:
+    en: 'Current: {llm}'
+    zh: 当前：{llm}
+  limits_section:
+    en: SPL Execution Limits
+    zh: SPL 执行限制
+  while_max_iter:
+    en: While Max Iterations
+    zh: 循环最大迭代次数
+  while_max_iter_title:
+    en: SPL_WHILE_MAX_ITER — max loop iterations before abort (default 15).
+    zh: SPL_WHILE_MAX_ITER——中止前的最大循环迭代次数（默认 15）。
+  max_llm_calls:
+    en: Max LLM Calls
+    zh: 最大 LLM 调用次数
+  max_llm_calls_title:
+    en: SPL_MAX_LLM_CALLS — max LLM GENERATE calls per workflow run.
+    zh: SPL_MAX_LLM_CALLS——每次工作流运行的最大 LLM GENERATE 调用次数。
+  ollama_unavailable:
+    en: (ollama not available)
+    zh: （ollama 不可用）
+  api_unreachable_hint:
+    en: API not reachable — run the backend to change settings
+    zh: 无法连接 API——请先运行后端再修改设置
+  saved:
+    en: Saved
+    zh: 已保存
+  save_failed:
+    en: Save failed
+    zh: 保存失败
+  api_unreachable:
+    en: API not reachable
+    zh: 无法连接 API
+  invalid_limits:
+    en: Enter valid integers ≥ 1
+    zh: 请输入 ≥ 1 的整数
+
+# About page body (HTML), one block per language.
+about:
+  body:
+    en: |
+      <h1>About concept-book</h1>
+      <p>
+        <strong>concept-book</strong> is an open portal that lets any learner explore a knowledge
+        domain through its <em>concept graph</em> — a directed acyclic graph (DAG) where nodes
+        are concepts (primitive, concept, application) and edges are prerequisite relationships.
+      </p>
+
+      <h2>How to use it</h2>
+      <ol>
+        <li>Pick a domain from the home page</li>
+        <li>Click any concept node in the interactive graph</li>
+        <li>The right panel lists the concepts on that node's prerequisite path — the ones to master first</li>
+        <li>Read the concept-book section for each concept in the path</li>
+      </ol>
+
+      <h2>The content engine</h2>
+      <p>
+        All domain graphs and concept-book text are generated by
+        <a href="https://github.com/digital-duck/SPL.py" target="_blank" rel="noopener">SPL.py</a>
+        — a structured programming language for LLM-driven content generation with math verification.
+        concept-book is the web-app layer that hosts and presents what SPL.py produces.
+      </p>
+
+      <h2>Open source</h2>
+      <p>
+        concept-book is open source under the Apache 2.0 license.
+        Source and contribution guide at
+        <a href="https://github.com/digital-duck/concept-book" target="_blank" rel="noopener">github.com/digital-duck/concept-book</a>.
+      </p>
+
+      <h2>The founding use-case: Chinese Characters</h2>
+      <p>
+        Chinese characters share the same structure as chemical elements — a small set of
+        elemental radicals (primitives) combine to form hundreds of compound characters.
+        Learning the ~12 elementals unlocks the ability to decode characters by structure alone.
+        The concept graph makes that derivation visible and navigable. See
+        <a href="https://github.com/digital-duck/cb-zinets" target="_blank" rel="noopener">cb-zinets</a>
+        — a concept-book fully built out around this founding use-case — if you'd like to dig deeper.
+      </p>
+    zh: |
+      <h1>关于 concept-book</h1>
+      <p>
+        <strong>concept-book</strong> 是一个开放的学习门户：任何学习者都可以通过<em>概念图</em>探索一个知识领域。
+        概念图是一张有向无环图（DAG），节点是概念（基础概念、概念、应用），边是先修关系。
+      </p>
+
+      <h2>使用方法</h2>
+      <ol>
+        <li>在首页选择一个领域</li>
+        <li>点击交互式概念图中的任意节点</li>
+        <li>右侧面板列出该节点先修路径上的概念——也就是需要先掌握的内容</li>
+        <li>逐一阅读路径上每个概念的概念书章节</li>
+      </ol>
+
+      <h2>内容引擎</h2>
+      <p>
+        所有领域概念图和概念书文本均由
+        <a href="https://github.com/digital-duck/SPL.py" target="_blank" rel="noopener">SPL.py</a>
+        生成——一种用于大语言模型驱动内容生成、并带有数学校验的结构化编程语言。
+        concept-book 是承载和呈现 SPL.py 产出的网页应用层。
+      </p>
+
+      <h2>开源</h2>
+      <p>
+        concept-book 以 Apache 2.0 许可证开源。源代码与贡献指南见
+        <a href="https://github.com/digital-duck/concept-book" target="_blank" rel="noopener">github.com/digital-duck/concept-book</a>。
+      </p>
+
+      <h2>缘起：汉字</h2>
+      <p>
+        汉字与化学元素结构相同——少量基本部件（基础概念）组合成数以百计的合体字。
+        掌握约 12 个基本部件，就能仅凭结构拆解汉字。概念图让这种推导过程清晰可见、便于浏览。
+        如想深入了解，请看
+        <a href="https://github.com/digital-duck/cb-zinets" target="_blank" rel="noopener">cb-zinets</a>
+        ——一个围绕这一缘起用例完整构建的概念书。
+      </p>
+
+# Fixed strings in generated book pages (spl/tools.py build_book_index).
+book:
+  book:
+    en: Concept Book
+    zh: 概念书
+  contents:
+    en: Contents
+    zh: 目录
+  payoff:
+    en: Payoff
+    zh: 学以致用

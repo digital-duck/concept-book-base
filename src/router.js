@@ -23,6 +23,11 @@ function _resolve() {
   _routes[path]?.(Object.fromEntries(new URLSearchParams(qs || '')))
 }
 
+// Re-render the current route (e.g. after a locale change).
+export function refresh() {
+  _resolve()
+}
+
 export function start() {
   window.addEventListener('hashchange', _resolve)
   _resolve()

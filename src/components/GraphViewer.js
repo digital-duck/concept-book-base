@@ -4,7 +4,9 @@
 // drawer is relaid out as a resizable pane (not a collapsible one) below
 // the graph — while keeping the click → cb:nodeSelected bridge.
 
-export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
+import { i18n, t, tl } from '../i18n.js'
+
+export function GraphViewer(domain, { level = 'intro', lang = 'en', signal } = {}) {
   const { id: domainId } = domain
 
   const el = document.createElement('div')
@@ -18,11 +20,11 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
   searchWrap.className = 'cb-graph-topbar__search'
   const searchInput = document.createElement('input')
   searchInput.type = 'text'
-  searchInput.placeholder = 'Search node…'
+  i18n(searchInput, 'graph.search_placeholder', { attr: 'placeholder' })
   searchInput.className = 'cb-graph-topbar__input'
   const searchBtn = document.createElement('button')
   searchBtn.type = 'button'
-  searchBtn.textContent = 'Search'
+  i18n(searchBtn, 'graph.search')
   searchBtn.className = 'cb-btn cb-graph-topbar__search-btn'
   searchWrap.append(searchInput, searchBtn)
 
@@ -31,19 +33,19 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
 
   const zoomOutBtn = document.createElement('button')
   zoomOutBtn.type = 'button'
-  zoomOutBtn.textContent = 'Zoom −'
-  zoomOutBtn.title = 'Zoom out'
+  i18n(zoomOutBtn, 'graph.zoom_out')
+  i18n(zoomOutBtn, 'graph.zoom_out_title', { attr: 'title' })
   zoomOutBtn.className = 'cb-btn cb-graph-topbar__zoom'
 
   const zoomInBtn = document.createElement('button')
   zoomInBtn.type = 'button'
-  zoomInBtn.textContent = 'Zoom +'
-  zoomInBtn.title = 'Zoom in'
+  i18n(zoomInBtn, 'graph.zoom_in')
+  i18n(zoomInBtn, 'graph.zoom_in_title', { attr: 'title' })
   zoomInBtn.className = 'cb-btn cb-graph-topbar__zoom'
 
   const recenterBtn = document.createElement('button')
   recenterBtn.type = 'button'
-  recenterBtn.textContent = 'Re-Center'
+  i18n(recenterBtn, 'graph.recenter')
   recenterBtn.className = 'cb-btn cb-graph-topbar__recenter'
 
   viewControls.append(zoomOutBtn, zoomInBtn, recenterBtn)
@@ -53,7 +55,7 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
   const frame = document.createElement('iframe')
   frame.className = 'cb-graph-viewer__frame'
   frame.src = `${import.meta.env.BASE_URL}domains/${domainId}/output/graph.html`
-  frame.title = `${domainId} concept graph`
+  i18n(frame, 'graph.frame_title', { attr: 'title', vars: { domain: domainId } })
   frame.setAttribute('allowfullscreen', '')
 
   function _doSearch() {
@@ -61,7 +63,10 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
     if (!q) return
     const win = frame.contentWindow
     const nodes = win?.__cb_RAW?.nodes || []
-    const match = nodes.find(n => n.label.toLowerCase().includes(q) || n.id.toLowerCase().includes(q))
+    // Match the id and every language's label, so `肝` and `liver` both work
+    // whatever the current locale.
+    const match = nodes.find(n =>
+      [n.id, n.label, ...Object.values(n.labels || {})].some(s => s.toLowerCase().includes(q)))
     searchInput.classList.remove('cb-graph-topbar__input--notfound')
     if (match) {
       win.selectNode?.(match.id)
@@ -92,6 +97,34 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
     } catch (_) {}
   }
   zoomInBtn.addEventListener('click', () => _zoom(1.25))
+
+  // Relabel graph nodes in the current locale, in place (no iframe reload, so
+  // zoom and selection survive). graph.html carries every language in each
+  // node's `labels`; nodes without a translation keep their original label.
+  // Mutating RAW's node objects also relabels nodeIndex (same objects), so
+  // getPath() — and the TOC built from it — sees localized labels too.
+  function _relabel() {
+    try {
+      const win = frame.contentWindow
+      const nodes = win?.__cb_RAW?.nodes
+      if (!nodes) return
+      nodes.forEach(n => {
+        n._label0 ??= n.label
+        n.label = tl(n.labels, n._label0)
+      })
+      const wrap = win.wrapLabel || (x => x.replace(/ /g, '\n'))
+      // A label update makes vis.js re-run its hierarchical layout, which
+      // discards graph.html's compact (tier-grouped) node positions — save
+      // and restore them so the graph doesn't jump on a language switch.
+      const net = win.__cb_network
+      const pos = net?.getPositions()
+      win.__cb_visNodes?.update(nodes.map(n => ({ id: n.id, label: wrap(n.label) })))
+      if (pos) Object.entries(pos).forEach(([id, { x, y }]) => net.moveNode(id, x, y))
+
+      _localizeNotes(frame.contentDocument, win.__cb_nodeIndex?.[net?.getSelectedNodes?.()[0]])
+    } catch (_) { /* graph not loaded yet */ }
+  }
+  window.addEventListener('cb:localeChanged', _relabel, { signal })
   zoomOutBtn.addEventListener('click', () => _zoom(0.8))
 
   frame.addEventListener('load', () => {
@@ -99,7 +132,10 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
       const win = frame.contentWindow
       if (!win) return
 
-      win.eval('window.__cb_RAW = RAW; window.__cb_nodeIndex = nodeIndex; window.__cb_network = network')
+      // visNodes is absent from graph.html files rendered before i18n support.
+      win.eval('window.__cb_RAW = RAW; window.__cb_nodeIndex = nodeIndex; window.__cb_network = network; ' +
+        "window.__cb_visNodes = typeof visNodes !== 'undefined' ? visNodes : null")
+      _relabel()
 
       // ── 1. Broadcast concept list to parent ──
       const concepts = (win.__cb_RAW?.nodes || []).map(n => ({
@@ -148,6 +184,20 @@ export function GraphViewer(domain, { level = 'intro', lang = 'en' } = {}) {
   }
 
   return el
+}
+
+// graph.html's Notes drawer is static English markup; relabel it from the
+// parent (its own JS is untouched). `selected` is the selected node, if any —
+// the drawer shows its label.
+function _localizeNotes(doc, selected) {
+  if (!doc) return
+  const q = s => doc.querySelector(s)
+  const set = (el, text) => { if (el) el.textContent = text }
+  set(q('#notes-header-top h2'), t('graph.notes'))
+  set(q('#nb-clear-btn'), t('graph.notes_clear'))
+  set(q('#nb-clear-btn + .nb-btn'), t('graph.notes_export'))
+  q('#notes-textarea')?.setAttribute('placeholder', t('graph.notes_placeholder'))
+  set(q('#notes-node-label'), selected ? selected.label : t('graph.notes_none'))
 }
 
 // ── Layout: hide path/explain panels + in-iframe recenter button, split
@@ -203,7 +253,7 @@ function _injectLayout(doc) {
   if (graphPanel && notesSidebar && app && !doc.querySelector('.cb-notes-gutter')) {
     const gutter = doc.createElement('div')
     gutter.className = 'cb-notes-gutter'
-    gutter.title = 'Drag to resize'
+    i18n(gutter, 'domain.drag_resize', { attr: 'title' })
     graphPanel.insertAdjacentElement('afterend', gutter)
     _wireVerticalResize(gutter, graphPanel, app)
   }

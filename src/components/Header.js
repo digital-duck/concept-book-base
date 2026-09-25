@@ -1,7 +1,9 @@
-import { t } from '../i18n.js'
+import { i18n } from '../i18n.js'
 import { appConfig } from '../config.js'
 import { LanguagePicker } from './LanguagePicker.js'
 
+// domainName: a string, or a function returning the (localized) name — a
+// function is re-evaluated in place on a locale change (see i18n()).
 export function Header({ domainName = '' } = {}) {
   const el = document.createElement('header')
   el.className = 'cb-header'
@@ -15,10 +17,10 @@ export function Header({ domainName = '' } = {}) {
   if (appConfig.logoImage) {
     const img = document.createElement('img')
     img.src = appConfig.logoImage
-    img.alt = t('app.title')
+    i18n(img, 'app.title', { attr: 'alt' })
     logo.appendChild(img)
   } else {
-    logo.textContent = t('app.title')
+    i18n(logo, 'app.title')
   }
   topRow.appendChild(logo)
 
@@ -30,7 +32,8 @@ export function Header({ domainName = '' } = {}) {
 
     const dn = document.createElement('span')
     dn.className = 'cb-header__domain'
-    dn.textContent = domainName
+    if (typeof domainName === 'function') i18n(dn, domainName)
+    else dn.textContent = domainName
     topRow.appendChild(dn)
   }
 
@@ -43,14 +46,14 @@ export function Header({ domainName = '' } = {}) {
 
   const settingsLink = document.createElement('a')
   settingsLink.href = '#/settings'
-  settingsLink.textContent = t('nav.settings')
+  i18n(settingsLink, 'nav.settings')
   nav.appendChild(settingsLink)
 
   nav.appendChild(LanguagePicker())
 
   const aboutLink = document.createElement('a')
   aboutLink.href = '#/about'
-  aboutLink.textContent = t('nav.about')
+  i18n(aboutLink, 'nav.about')
   nav.appendChild(aboutLink)
 
   topRow.appendChild(nav)

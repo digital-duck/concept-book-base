@@ -10,6 +10,7 @@ The loaded domain graph is cached in _DOMAIN_CACHE for the process lifetime.
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 from pathlib import Path
@@ -119,20 +120,22 @@ def order_bullets(domain_yaml: str) -> str:
 
 
 @spl_tool
-def apps_list(domain_yaml: str) -> str:
+def apps_list(domain_yaml: str, language: str = "en") -> str:
     """Return applications of the target concept as comma-separated labels ("none" if empty).
 
     Labels, not ids: this feeds write_payoff's prompt, and ids there get
     echoed verbatim into the generated prose.
     """
-    return ", ".join(concept_label(a) for a in _domain(domain_yaml)["apps"]) or "none"
+    cache = _domain(domain_yaml)
+    return ", ".join(_label_for(cache["data"], a, language) for a in cache["apps"]) or "none"
 
 
 @spl_tool
-def prereq_labels(domain_yaml: str, concept: str) -> str:
+def prereq_labels(domain_yaml: str, concept: str, language: str = "en") -> str:
     """Return the concept's direct prerequisites as comma-separated labels ("none" if empty)."""
-    graph = _domain(domain_yaml)["graph"]
-    return ", ".join(concept_label(p) for p in sorted(graph.predecessors(concept))) or "none"
+    cache = _domain(domain_yaml)
+    return ", ".join(_label_for(cache["data"], p, language)
+                     for p in sorted(cache["graph"].predecessors(concept))) or "none"
 
 
 @spl_tool
@@ -356,6 +359,55 @@ def concept_label(concept: str) -> str:
     return concept.replace('_', ' ').title()
 
 
+def _label_for(data: dict, concept: str, language: str) -> str:
+    """A node's display label in `language`: its `labels: {lang: ...}` entry if the
+    graph has one, else the English label, else the title-cased id."""
+    for section in ("primitives", "concepts", "applications"):
+        node = (data.get(section) or {}).get(concept)
+        if node:
+            labels = node.get("labels") or {}
+            return labels.get(language) or labels.get("en") or concept_label(concept)
+    return concept_label(concept)
+
+
+@spl_tool
+def section_params(params_json: str, context: str) -> str:
+    """Return params_json extended with a short hash of the section's context.
+
+    The content-cache key is (concept, params). Without the context in it, a
+    concept declared in two chapters with different `defines` text shares one
+    cache slot: a later chapter silently reuses the earlier chapter's
+    section, and with skip_cache the last chapter to run overwrites it for
+    everyone. Hashing the context gives each distinct definition its own
+    entry, and editing a node's `defines` invalidates its cached section
+    automatically.
+    """
+    import hashlib
+    import json
+    params = json.loads(params_json) if params_json else {}
+    params["ctx"] = hashlib.sha256((context or "").encode("utf-8")).hexdigest()[:16]
+    return json.dumps(params, sort_keys=True, ensure_ascii=False)
+
+
+def _has_label(data: dict, concept: str, language: str) -> bool:
+    """True if the graph gives this concept an explicit label in `language`."""
+    for section in ("primitives", "concepts", "applications"):
+        node = (data.get(section) or {}).get(concept)
+        if node:
+            return bool((node.get("labels") or {}).get(language))
+    return False
+
+
+@spl_tool
+def localized_label(domain_yaml: str, concept: str, language: str = "en") -> str:
+    """Return the concept's display label in `language` (see _label_for).
+
+    Used for section headings, page titles and the book TOC, so a zh page
+    gets a Chinese heading rather than the English title-cased id.
+    """
+    return _label_for(_domain(domain_yaml)["data"], concept, language)
+
+
 @spl_tool
 def concept_context(domain_yaml: str, concept: str) -> str:
     """Return the concept's own `defines` text from the domain graph, for use
@@ -394,13 +446,21 @@ def write_concept_html(concept: str, section: str, domain_yaml: str, output_dir:
         return ""
     domain_id = _domain_id_from_yaml(domain_yaml)
     domain_title = _esc(domain_id.replace('_', ' ').title())
-    label = concept.replace('_', ' ').title()
-    # Normalize first H2 heading: LLM may write ## concept_id; replace with ## Concept Label
-    section = re.sub(
-        r'^##\s+' + re.escape(concept) + r'[ \t]*$',
-        f'## {label}',
-        section, count=1, flags=re.MULTILINE,
-    )
+    label = localized_label(domain_yaml, concept, language)
+    if _has_label(_domain(domain_yaml)["data"], concept, language):
+        # The graph names this concept in `language`: make the section's leading
+        # H2 match it, whatever the LLM wrote there (the id, the English
+        # title-case label, its own translation). Also fixes sections served
+        # from the content cache without an LLM call.
+        section = re.sub(r'\A\s*##[ \t]+[^\n]*', f'## {label}', section, count=1)
+    else:
+        # No label for this language: only replace a bare concept-id heading,
+        # keeping e.g. the LLM's own translated heading on a non-English page.
+        section = re.sub(
+            r'^##\s+' + re.escape(concept) + r'[ \t]*$',
+            f'## {label}',
+            section, count=1, flags=re.MULTILINE,
+        )
     lang_attr = f' lang="{language}"' if language and language != 'en' else ' lang="en"'
     html = _render(
         _CONCEPT_PAGE_TEMPLATE,
@@ -415,6 +475,30 @@ def write_concept_html(concept: str, section: str, domain_yaml: str, output_dir:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     return str(out)
+
+
+# Fixed strings on the book index page, per language (English fallback).
+# Source of truth is the `book:` block of locales/ui.yaml (shared with the
+# frontend); these built-in English strings are used when that file is absent,
+# e.g. when spl/ is copied into a repo without locales/.
+_BOOK_UI_DEFAULT: dict[str, str] = {"book": "Concept Book", "contents": "Contents", "payoff": "Payoff"}
+_LOCALES_DIR = Path(os.environ.get("CB_LOCALES_DIR") or _CB_DIR.parent / "locales")
+_BOOK_UI_CACHE: dict[str, dict] | None = None
+
+
+def _book_ui(language: str) -> dict[str, str]:
+    """Book-page strings for `language`, falling back key by key to English."""
+    global _BOOK_UI_CACHE
+    if _BOOK_UI_CACHE is None:
+        try:
+            import yaml
+            _BOOK_UI_CACHE = (yaml.safe_load((_LOCALES_DIR / "ui.yaml").read_text(encoding="utf-8")) or {}).get("book", {})
+        except (OSError, ImportError):
+            _BOOK_UI_CACHE = {}
+    ui = dict(_BOOK_UI_DEFAULT)
+    for key, texts in _BOOK_UI_CACHE.items():
+        ui[key] = texts.get(language) or texts.get("en") or ui.get(key, key)
+    return ui
 
 
 @spl_tool
@@ -435,11 +519,14 @@ def build_book_index(domain_yaml: str, target: str, language: str, output_dir: s
 
     toc_items = []
     for concept in order:
-        label = _esc(concept.replace('_', ' ').title())
+        label = _esc(localized_label(domain_yaml, concept, language))
         cls = ' class="toc-target"' if concept == target else ''
         toc_items.append(f'<li{cls}><a href="concept_{concept}{suffix}.html">{label}</a></li>')
     toc_html = '<ol>\n' + '\n'.join(toc_items) + '\n</ol>'
 
+    ui = _book_ui(language)
+    # write_payoff is told to begin with "## Payoff"; show it in the book's language.
+    payoff = re.sub(r'\A\s*##[ \t]+Payoff\b[^\n]*', f"## {ui['payoff']}", payoff)
     # Non-application targets never get a payoff (see build_concept_book.spl's
     # target_kind gating) — render no empty <section></section> for them.
     payoff_html = f'<section>\n      {_md_to_html(payoff)}\n    </section>' if payoff.strip() else ''
@@ -447,7 +534,9 @@ def build_book_index(domain_yaml: str, target: str, language: str, output_dir: s
         _BOOK_INDEX_TEMPLATE,
         lang_attr=lang_attr,
         domain_title=domain_title,
-        target_title=_esc(target.replace('_', ' ').title()),
+        target_title=_esc(localized_label(domain_yaml, target, language)),
+        book_label=_esc(ui["book"]),
+        contents_label=_esc(ui["contents"]),
         toc=toc_html,
         payoff=payoff_html,
         footer_meta=_footer_meta(output_dir, language, domain, domain_title),
@@ -618,7 +707,7 @@ _BOOK_INDEX_TEMPLATE = """\
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Concept Book: {target_title} — {domain_title}</title>
+<title>{book_label}: {target_title} — {domain_title}</title>
 """ + _MATHJAX_HEAD + """
 <style>
 """ + _SHARED_CSS + """
@@ -645,11 +734,11 @@ nav.toc{position:relative;height:auto}}
 <body>
 <div class="page">
   <nav class="toc">
-    <h2>Contents</h2>
+    <h2>{contents_label}</h2>
     {toc}
   </nav>
   <main>
-    <h1 class="book-title">Concept Book: {target_title}</h1>
+    <h1 class="book-title">{book_label}: {target_title}</h1>
     <p class="subtitle">{domain_title} &middot; Generated by SPL</p>
     <section>
       {payoff}

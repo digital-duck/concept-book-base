@@ -1,7 +1,8 @@
-import { LANGUAGES } from './LanguagePicker.js'
+import { CONTENT_LANGUAGES } from './LanguagePicker.js'
 import { conceptUrl, parseLevelLangModel } from '../lib/paths.js'
 import { checkExists, clearExistsCache } from '../lib/contentExists.js'
 import { loadCatalog, clearCatalogCache } from '../data/catalog.js'
+import { getLocale, i18n, t } from '../i18n.js'
 
 const LEVELS = ['intro', 'core', 'college', 'research']
 
@@ -22,10 +23,10 @@ const MODELS = [
   { value: 'opus', label: 'opus (Claude)' },
 ]
 
-function makeSelect(options, current, cls, title) {
+function makeSelect(options, current, cls, titleKey) {
   const sel = document.createElement('select')
   sel.className = cls
-  if (title) sel.title = title
+  if (titleKey) i18n(sel, titleKey, { attr: 'title' })
   options.forEach(({ value, label }) => {
     const opt = document.createElement('option')
     opt.value = value
@@ -51,6 +52,13 @@ function _fillConceptIndex(index, domain) {
   })
 }
 
+// A language's name inside a UI sentence ("Chinese" / "中文"), falling back to
+// the content-language dropdown's label for languages ui.yaml doesn't name.
+function _langName(code) {
+  const name = t(`langname.${code}`)
+  return name !== `langname.${code}` ? name : (CONTENT_LANGUAGES.find(l => l.code === code)?.label || code)
+}
+
 export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer, signal } = {}) {
   const el = document.createElement('aside')
   el.className = 'cb-content-panel'
@@ -67,6 +75,7 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   // to the anchor, but moves independently as the user clicks TOC entries,
   // without recomputing the TOC itself.
   let anchorNodeId = null
+  let anchorNode = null
   let displayNodeId = null
   let displayNode = null
   // Bumped on every resolveContent() call; a call whose token no longer
@@ -80,13 +89,19 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   // generated in place of the one requested (see modelSel's listener below).
   let modelPinned = false
 
-  // Finds a catalog-known file for this node at the current level/lang,
-  // preferring an entry matching the selected model, else a model-less one,
-  // else whatever's first — mirrors GraphViewer's old _buildConceptUrlMap
-  // preference order. Returns null if nothing at this level/lang is known.
-  function findCatalogEntry(nodeId) {
+  // Language actually displayed — differs from state.lang when the requested
+  // language isn't generated and resolveContent() fell back (see below).
+  let shownLang = state.lang
+  let shownModel = state.model
+
+  // Finds a catalog-known file for this node at the current level and the
+  // given language (default: the selected one), preferring an entry matching
+  // the selected model, else a model-less one, else whatever's first —
+  // mirrors GraphViewer's old _buildConceptUrlMap preference order. Returns
+  // null if nothing at this level/lang is known.
+  function findCatalogEntry(nodeId, lang = state.lang) {
     const candidates = (conceptIndex.get(nodeId) || [])
-      .filter(e => e.level === state.level && e.lang === state.lang)
+      .filter(e => e.level === state.level && e.lang === lang)
     if (!candidates.length) return null
     const exact = candidates.find(e => e.model === state.model)
     // Once the user has explicitly picked a model, respect it even when
@@ -101,26 +116,27 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   const controls = document.createElement('div')
   controls.className = 'cb-book-pane__controls'
 
-  const modelSel = makeSelect(MODELS, state.model, 'cb-book-pane__select', 'Model')
-  const levelSel = makeSelect(LEVELS.map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })), state.level, 'cb-book-pane__select', 'Level')
-  const langSel = makeSelect(LANGUAGES.map(l => ({ value: l.code, label: l.label })), state.lang, 'cb-book-pane__select', 'Language')
+  const modelSel = makeSelect(MODELS, state.model, 'cb-book-pane__select', 'panel.model')
+  const levelSel = makeSelect(LEVELS.map(v => ({ value: v, label: v })), state.level, 'cb-book-pane__select', 'panel.level')
+  levelSel.querySelectorAll('option').forEach(o => i18n(o, `level.${o.value}`))
+  const langSel = makeSelect(CONTENT_LANGUAGES.map(l => ({ value: l.code, label: l.label })), state.lang, 'cb-book-pane__select', 'panel.language')
 
   const refreshBtn = document.createElement('button')
   refreshBtn.type = 'button'
   refreshBtn.className = 'cb-book-pane__refresh'
-  refreshBtn.title = 'Refresh — re-check for content that just finished generating'
+  i18n(refreshBtn, 'panel.refresh', { attr: 'title' })
   refreshBtn.textContent = '🔄'
 
   const genBtn = document.createElement('button')
   genBtn.type = 'button'
   genBtn.className = 'cb-btn cb-btn--primary cb-ide-gen-btn'
-  genBtn.textContent = 'Generate'
+  i18n(genBtn, 'panel.generate')
   genBtn.disabled = true
 
   const pdfBtn = document.createElement('button')
   pdfBtn.type = 'button'
   pdfBtn.className = 'cb-btn cb-ide-pdf-btn'
-  pdfBtn.textContent = 'Export PDF'
+  i18n(pdfBtn, 'panel.export_pdf')
   pdfBtn.disabled = true
 
   const skipCacheLbl = document.createElement('label')
@@ -128,7 +144,7 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   const skipCacheChk = document.createElement('input')
   skipCacheChk.type = 'checkbox'
   skipCacheLbl.appendChild(skipCacheChk)
-  skipCacheLbl.appendChild(document.createTextNode('Skip cache'))
+  skipCacheLbl.appendChild(i18n(document.createElement('span'), 'panel.skip_cache'))
 
   controls.append(modelSel, levelSel, langSel, refreshBtn, genBtn, skipCacheLbl, pdfBtn)
   el.appendChild(controls)
@@ -139,11 +155,11 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
 
   const toc = document.createElement('nav')
   toc.className = 'cb-ide-toc'
-  toc.innerHTML = '<p class="cb-panel__hint">Click any node in the graph to see its details.</p>'
+  toc.innerHTML = `<p class="cb-panel__hint">${t('panel.hint_click')}</p>`
 
   const contentArea = document.createElement('div')
   contentArea.className = 'cb-ide-content'
-  contentArea.innerHTML = '<p class="cb-panel__hint">Click any node in the graph to see its details.</p>'
+  contentArea.innerHTML = `<p class="cb-panel__hint">${t('panel.hint_click')}</p>`
 
   body.append(toc, contentArea)
   el.appendChild(body)
@@ -157,11 +173,11 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   const copyLogBtn = document.createElement('button')
   copyLogBtn.type = 'button'
   copyLogBtn.className = 'cb-ide-log-copy'
-  copyLogBtn.textContent = 'Copy'
+  i18n(copyLogBtn, 'panel.copy')
   copyLogBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(log.textContent).then(() => {
-      copyLogBtn.textContent = 'Copied!'
-      setTimeout(() => { copyLogBtn.textContent = 'Copy' }, 1500)
+      i18n(copyLogBtn, 'panel.copied')
+      setTimeout(() => { i18n(copyLogBtn, 'panel.copy') }, 1500)
     })
   })
   logWrap.append(log, copyLogBtn)
@@ -179,13 +195,27 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   langSel.addEventListener('change', onControlsChange)
   refreshBtn.addEventListener('click', () => { clearExistsCache(); resolveContent() })
 
+  // The top-bar language overwrites the content language; the Language
+  // dropdown can still override it afterwards (e.g. compare EN vs ZH) until
+  // the next top-bar change. GraphViewer's listener (registered first) has
+  // already relabeled the nodes, so the TOC re-renders with the new labels.
+  window.addEventListener('cb:localeChanged', e => {
+    const { lang } = e.detail
+    if (CONTENT_LANGUAGES.some(l => l.code === lang)) {
+      langSel.value = lang
+      state.lang = lang
+    }
+    renderToc(anchorNode)
+    resolveContent()
+  }, { signal })
+
   // ── TOC ──────────────────────────────────────────────────────────────────
   // Rebuilt only when the *anchor* (graph-clicked) node changes — clicking
   // an entry inside the TOC never recomputes it, it only changes which
   // node's content is displayed (see the click handler below).
   function renderToc(anchorNode) {
     if (!anchorNodeId) {
-      toc.innerHTML = '<p class="cb-panel__hint">Click any node in the graph to see its details.</p>'
+      toc.innerHTML = `<p class="cb-panel__hint">${t('panel.hint_click')}</p>`
       return
     }
     const pathInfo = graphViewer?.getPath?.(anchorNodeId)
@@ -193,10 +223,10 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
     const seen = new Set()
     const entries = candidates
       .filter(n => !seen.has(n.id) && seen.add(n.id))
-      .sort((a, b) => a.label.localeCompare(b.label))
+      .sort((a, b) => a.label.localeCompare(b.label, getLocale()))
 
     if (!entries.length) {
-      toc.innerHTML = '<p class="cb-panel__hint">No concepts found on this path.</p>'
+      toc.innerHTML = `<p class="cb-panel__hint">${t('panel.no_path')}</p>`
       return
     }
 
@@ -244,42 +274,69 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   // directly used to show only its one-line `defines` blurb with Generate
   // disabled, even though the backend could always generate real content
   // for it — that was a frontend-only restriction, not a backend one.
+  // Finds a displayable page for the current node in `lang`: the catalog's
+  // record first (it knows the exact model a file was generated with, so a
+  // node generated only under e.g. "sonnet" is found whatever the Model
+  // dropdown says), else the conventional path (content generated this
+  // session, not yet in catalog.json). Returns {url, model} or null.
+  async function locate(lang) {
+    const known = findCatalogEntry(displayNodeId, lang)
+    if (known) return { url: `${import.meta.env.BASE_URL}domains/${domain.id}/${known.file}`, model: known.model }
+    const url = conceptUrl(domain.id, state.level, lang, state.model, displayNodeId)
+    return (await checkExists(url)) ? { url, model: state.model } : null
+  }
+
+  // Resolves content in the requested language, else falls back to English,
+  // else to any language this node has at this level — and *shows* the
+  // fallback (with a notice) rather than an empty state. The Language
+  // dropdown keeps the requested language, so Generate still targets it.
   async function resolveContent() {
     if (!displayNodeId || !displayNode) return
     const token = ++_resolveToken
 
-    contentArea.innerHTML = '<p class="cb-panel__hint">Loading…</p>'
+    contentArea.innerHTML = `<p class="cb-panel__hint">${t('loading')}</p>`
 
-    // Prefer the catalog's own record of what's been generated — it knows
-    // the exact model a file was generated with, so a node generated only
-    // under e.g. "sonnet" is found even if the Model dropdown is still at
-    // "— default —". Falls back to guessing the conventional path (for
-    // content generated in this session, not yet reflected in catalog.json).
-    const known = findCatalogEntry(displayNodeId)
-    let url
-    if (known) {
-      url = `${import.meta.env.BASE_URL}domains/${domain.id}/${known.file}`
-      // Only auto-follow the catalog's model when the user hasn't pinned
-      // one explicitly — see findCatalogEntry()/modelPinned above.
-      if (!modelPinned && known.model !== state.model) {
-        state.model = known.model
-        modelSel.value = known.model
-      }
-    } else {
-      url = conceptUrl(domain.id, state.level, state.lang, state.model, displayNodeId)
+    const otherLangs = (conceptIndex.get(displayNodeId) || [])
+      .filter(e => e.level === state.level).map(e => e.lang)
+    const order = [...new Set([state.lang, 'en', ...otherLangs])]
+    let found = null
+    let lang = null
+    for (lang of order) {
+      found = await locate(lang)
+      if (token !== _resolveToken) return
+      if (found) break
     }
 
-    const exists = known ? true : await checkExists(url)
-    if (token !== _resolveToken) return
+    genBtn.disabled = false
+    i18n(genBtn, 'panel.generate')
 
-    if (exists) {
-      genBtn.disabled = false
-      genBtn.textContent = 'Generate'
+    if (found) {
+      shownLang = lang
+      shownModel = found.model || state.model
+      // Only auto-follow the catalog's model for the requested language, and
+      // only when the user hasn't pinned one — see findCatalogEntry()/modelPinned.
+      if (lang === state.lang && !modelPinned && found.model && found.model !== state.model) {
+        state.model = found.model
+        modelSel.value = found.model
+      }
       pdfBtn.disabled = false
       contentArea.innerHTML = ''
+      if (lang !== state.lang) {
+        const notice = document.createElement('div')
+        notice.className = 'cb-ide-fallback-notice'
+        const text = document.createElement('span')
+        text.textContent = t('panel.fallback_notice', { requested: _langName(state.lang), shown: _langName(lang) })
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.className = 'cb-btn cb-ide-fallback-notice__gen'
+        btn.textContent = t('panel.generate_in', { lang: _langName(state.lang) })
+        btn.addEventListener('click', () => genBtn.click())
+        notice.append(text, btn)
+        contentArea.appendChild(notice)
+      }
       const iframe = document.createElement('iframe')
       iframe.className = 'cb-ide-content__frame'
-      iframe.src = url
+      iframe.src = found.url
       // Generated pages ship their own `nav.toc` sidebar (a "← back to
       // domain" link + a per-page chapter TOC) baked into the static HTML
       // by spl/tools.py — useful when opening a page standalone, but pure
@@ -298,14 +355,13 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
       })
       contentArea.appendChild(iframe)
     } else {
-      genBtn.disabled = false
-      genBtn.textContent = 'Generate'
+      shownLang = state.lang
       pdfBtn.disabled = true
       contentArea.innerHTML = `
         <div class="cb-ide-empty">
           <h3>${displayNode.label}</h3>
           ${displayNode.defines ? `<p>${displayNode.defines}</p>` : ''}
-          <p>⚠️ Missing content for model=<strong>${state.model}</strong>, level=<strong>${state.level}</strong>, language=<strong>${state.lang}</strong>, click <strong>Generate</strong> button to create</p>
+          <p>${t('panel.missing', { model: state.model, level: state.level, lang: state.lang })}</p>
         </div>
       `
     }
@@ -321,7 +377,7 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
     const skipCache = skipCacheChk.checked
 
     genBtn.disabled = true
-    genBtn.textContent = 'Generating…'
+    i18n(genBtn, 'panel.generating')
     logWrap.style.display = 'block'
     log.textContent = `▶ target: ${target}  model: ${model || 'default'}  level: ${lvl}  language: ${lng}\n`
 
@@ -336,10 +392,10 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
 
     es.addEventListener('done', async () => {
       es.close()
-      log.textContent += '\n✓ Done'
+      log.textContent += '\n' + t('panel.log_done')
       clearExistsCache()
       genBtn.disabled = false
-      genBtn.textContent = 'Generate'
+      i18n(genBtn, 'panel.generate')
       // The catalog snapshot this panel was built with predates whatever
       // was just generated — without refreshing it, findCatalogEntry()
       // can't see the new file and resolveContent() falls back to guessing
@@ -366,7 +422,7 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
       es.close()
       log.textContent += `\n✗ ${JSON.parse(e.data).message}`
       genBtn.disabled = false
-      genBtn.textContent = 'Retry'
+      i18n(genBtn, 'panel.retry')
     })
 
     es.onerror = () => {
@@ -375,9 +431,9 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
       // sending a gen_error event), that retry loop runs silently forever
       // and leaves the button stuck on "Generating…" with no feedback.
       es.close()
-      log.textContent += '\n✗ Connection to the API dropped or is unreachable.\n  Check the API terminal for errors, or run: bash scripts/start-api.sh'
+      log.textContent += '\n' + t('panel.log_dropped')
       genBtn.disabled = false
-      genBtn.textContent = 'Retry'
+      i18n(genBtn, 'panel.retry')
     }
   })
 
@@ -386,22 +442,22 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
     if (!displayNodeId) return
     const target = displayNodeId
     pdfBtn.disabled = true
-    pdfBtn.textContent = 'Exporting…'
+    i18n(pdfBtn, 'panel.exporting')
 
     try {
-      const url = `/api/pdf?domain=${encodeURIComponent(domain.id)}&target=${encodeURIComponent(target)}&level=${encodeURIComponent(state.level)}&language=${encodeURIComponent(state.lang)}&model=${encodeURIComponent(state.model)}`
+      const url = `/api/pdf?domain=${encodeURIComponent(domain.id)}&target=${encodeURIComponent(target)}&level=${encodeURIComponent(state.level)}&language=${encodeURIComponent(shownLang)}&model=${encodeURIComponent(shownModel)}`
       const res = await fetch(url)
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'PDF generation failed')
 
       const pdfUrl = `${import.meta.env.BASE_URL}domains/${domain.id}/${data.file}`
-      pdfBtn.textContent = 'Export PDF ✓'
+      i18n(pdfBtn, 'panel.exported')
       pdfBtn.disabled = false
       window.open(pdfUrl, '_blank', 'noopener')
     } catch (err) {
-      pdfBtn.textContent = 'Error'
+      i18n(pdfBtn, 'panel.export_error')
       pdfBtn.title = err.message
-      setTimeout(() => { pdfBtn.textContent = 'Export PDF'; pdfBtn.disabled = false }, 3000)
+      setTimeout(() => { i18n(pdfBtn, 'panel.export_pdf'); pdfBtn.disabled = false }, 3000)
     }
   })
 
@@ -412,6 +468,7 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
   // displayed, never re-anchors.
   window.addEventListener('cb:nodeSelected', e => {
     anchorNodeId = e.detail.nodeId
+    anchorNode = e.detail.node
     displayNodeId = e.detail.nodeId
     displayNode = e.detail.node
     logWrap.style.display = 'none'

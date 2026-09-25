@@ -177,9 +177,17 @@ SUBJECT_RIGOR: dict[str, str] = {
         "doses. Never express qualitative or traditional-medicine ideas "
         "(qi, yin-yang, the Five Phases, emotions, balance, harmony) as "
         "equations, proportionalities, or logic formulas; explain them in "
-        "words, tables, and concrete examples. Present traditional claims "
-        "as traditional, and say plainly when a claim is not established by "
-        "scientific evidence."
+        "words, tables, and concrete examples.\n"
+        "Attribution: attribute traditional-medicine ideas neutrally and "
+        "briefly with the acronym — 'In TCM, …', 'TCM holds that …' (Chinese: "
+        "中医认为…; never 传统中医, since 中医 already means TCM). Spell out "
+        "'Traditional Chinese Medicine (TCM)' only where the book first "
+        "introduces it, not in every section. State a concept's evidence "
+        "status at most once per section, and only where it matters to the "
+        "reader; do not repeat the caveat. 'Traditional' describes origin, "
+        "not merit: never present a TCM idea as 'wisdom' or 'time-tested' "
+        "(传统智慧, 古人智慧), and where a traditional belief or practice is "
+        "disproven or harmful, say so plainly."
     ),
 }
 

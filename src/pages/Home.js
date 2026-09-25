@@ -1,7 +1,7 @@
 import { loadCatalog } from '../data/catalog.js'
 import { DomainCard } from '../components/DomainCard.js'
 import { Header } from '../components/Header.js'
-import { t } from '../i18n.js'
+import { t, tagLabel } from '../i18n.js'
 
 export async function Home(container) {
   container.innerHTML = ''
@@ -16,7 +16,7 @@ export async function Home(container) {
   try {
     catalog = await loadCatalog()
   } catch (err) {
-    main.innerHTML = `<p class="cb-error">Could not load domains. ${err.message}</p>`
+    main.innerHTML = `<p class="cb-error">${t('home.load_error', { error: err.message })}</p>`
     return
   }
 
@@ -33,18 +33,18 @@ export async function Home(container) {
     main.innerHTML = `
       <div class="cb-home__filters">
         <span class="cb-filter-group">
-          <span class="cb-filter-label">Subject</span>
-          <button class="cb-filter-btn ${activeTag === 'all' ? 'active' : ''}" data-tag="all">All</button>
+          <span class="cb-filter-label">${t('home.filter.subject')}</span>
+          <button class="cb-filter-btn ${activeTag === 'all' ? 'active' : ''}" data-tag="all">${t('home.filter.all')}</button>
           ${allTags.map(t_ =>
-            `<button class="cb-filter-btn ${activeTag === t_ ? 'active' : ''}" data-tag="${t_}">${t_}</button>`
+            `<button class="cb-filter-btn ${activeTag === t_ ? 'active' : ''}" data-tag="${t_}">${tagLabel(t_)}</button>`
           ).join('')}
         </span>
         <span class="cb-filter-right">
-          <span class="cb-filter-label">Level</span>
+          <span class="cb-filter-label">${t('home.filter.level')}</span>
           <select class="cb-level-select" id="cb-level-filter">
-            <option value="all" ${activeLevel === 'all' ? 'selected' : ''}>All</option>
+            <option value="all" ${activeLevel === 'all' ? 'selected' : ''}>${t('home.filter.all')}</option>
             ${allLevels.map(l =>
-              `<option value="${l}" ${activeLevel === l ? 'selected' : ''}>${l.charAt(0).toUpperCase() + l.slice(1)}</option>`
+              `<option value="${l}" ${activeLevel === l ? 'selected' : ''}>${t(`level.${l}`)}</option>`
             ).join('')}
           </select>
         </span>

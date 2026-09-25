@@ -134,6 +134,21 @@ python scripts/batch_gen_domains.py -f scripts/domains-college-physics.txt \
 
 The spl3 content cache key is `(concept, language, style, llm)`, so the same concept at a different level (style) is a separate cache entry. The style *name* is in the key, not the prompt text, so after a prompt or style-profile change, add `--skip-cache` to regenerate.
 
+Since 2026-09-24 the key also includes a hash of the concept's `defines` text (`ctx`, via
+`spl/tools.py`'s `section_params`). Before that, a concept declared in several chapters (e.g. a
+later chapter re-declaring an earlier concept as a primitive) shared one cache slot. A later
+chapter silently reused the earlier chapter's section, and with `--skip-cache` the last chapter
+to run overwrote it for all of them. Editing a node's `defines` now invalidates its cached
+section automatically. **After upgrading, existing cache entries no longer match, so the first
+run of each domain regenerates everything once.**
+
+**Localized labels (optional):** a node may carry `labels: {en: "...", zh: "..."}` in
+`graph.yaml`. `localized_label()` uses it for section headings, page titles and the book TOC, with
+a fallback to the title-cased id. When a node has a label for the page's language, the section's
+leading `##` heading is normalized to it (even for cached sections); without one, the LLM's own
+heading is kept. The book index's fixed strings ("Contents", "Payoff", "Concept Book") are
+localized via `_BOOK_UI` in `spl/tools.py` (en and zh so far).
+
 - Same concept in **different languages** → separate cache entries (independent)
 - Same concept with **different LLM** → separate cache entries (good for quality comparison)
 - Re-running without `--skip-cache` reuses the cached version → fast (0 LLM calls)

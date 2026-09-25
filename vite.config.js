@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import yaml from '@rollup/plugin-yaml'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,6 +31,8 @@ const DEV_PORT = parseInt(localEnv.DEV_PORT || process.env.DEV_PORT || '5173', 1
 
 export default defineConfig({
   base: `/${repoName}/`,
+  // locales/*.yaml → bundled JS objects (see src/i18n.js)
+  plugins: [yaml()],
   server: {
     port: DEV_PORT,
     proxy: {

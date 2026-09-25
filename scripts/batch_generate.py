@@ -89,6 +89,11 @@ _LANG_MAP: dict[str, str] = {
     "russian":    "ru",
     "arabic":     "ar",
     "hindi":      "hi",
+    # Common non-ISO codes — `jp` once produced a whole college.jp/ tree that
+    # the app (which asks for `ja`) could never find.
+    "jp":         "ja",
+    "cn":         "zh",
+    "kr":         "ko",
 }
 
 

@@ -1,0 +1,33 @@
+# Content translations: chapter (domain) names and descriptions, and a display
+# label for every concept, per language. Shape: key → {lang: text}, block style
+# (one language per line); a missing language falls back to `en`.
+#
+# Build-time only — never read by the running app. scripts/apply_content_locale.py
+# writes `concepts` into each graph.yaml node's `labels:` (read by spl/tools.py
+# localized_label() and, via concept_graph.py, by graph.html) and `domains` into
+# catalog.json (`name`/`description` = en, `i18n.<lang>` = the rest). App-shell
+# strings live in locales/ui.yaml. See docs/DEV/readme-i18n.md §2a.
+#
+# Example:
+#   domains:
+#     my_domain_ch1:
+#       name:
+#         en: "Ch1: Limits"
+#         zh: 第一章 极限
+#       description:
+#         en: What a limit is, and why calculus needs it.
+#         zh: 什么是极限，以及微积分为何需要它。
+#   concepts:
+#     epsilon_delta:            # one entry per concept id, shared across domains
+#       en: Epsilon–Delta Definition
+#       zh: ε-δ 定义
+#     field:                    # an id that means different things in different
+#       en: Field               # domains can be overridden per domain under
+#       zh: 域                  # domains.<id>.concepts.<concept>
+
+_meta:
+  source: en
+
+domains: {}
+
+concepts: {}

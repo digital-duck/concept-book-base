@@ -1,9 +1,5 @@
 import { Header } from '../components/Header.js'
-import { getLocale } from '../i18n.js'
-
-export function getContentLang() {
-  return getLocale()
-}
+import { i18n, bindI18n, t } from '../i18n.js'
 
 // Adapters that need a user-supplied API key (shown in the Settings form).
 // claude_cli authenticates via the local CLI's own login; ollama is local —
@@ -85,7 +81,7 @@ async function populateModels(adapterSel, modelSel) {
     if (!models || models.length === 0) {
       const opt = document.createElement('option')
       opt.value = ''
-      opt.textContent = '(ollama not available)'
+      i18n(opt, 'settings.ollama_unavailable')
       modelSel.appendChild(opt)
       return
     }
@@ -107,12 +103,12 @@ export async function Settings(container) {
   const main = document.createElement('main')
   main.className = 'cb-settings'
   main.innerHTML = `
-    <h2>Settings</h2>
+    <h2 data-t="settings.title"></h2>
     <section class="cb-settings__section">
-      <div class="cb-settings__section-title">SPL Adapter and Model Configuration</div>
+      <div class="cb-settings__section-title" data-t="settings.llm_section"></div>
       <div class="cb-settings__pair">
         <div class="cb-settings__field">
-          <label class="cb-settings__label">Adapter</label>
+          <label class="cb-settings__label" data-t="settings.adapter"></label>
           <select id="cb-adapter" class="cb-settings__select">
             ${Object.entries(ADAPTERS).map(([k, v]) =>
               `<option value="${k}">${v.label}</option>`
@@ -120,46 +116,47 @@ export async function Settings(container) {
           </select>
         </div>
         <div class="cb-settings__field cb-settings__field--grow">
-          <label class="cb-settings__label">Model</label>
+          <label class="cb-settings__label" data-t="settings.model"></label>
           <select id="cb-model" class="cb-settings__select"></select>
         </div>
       </div>
       <div class="cb-settings__pair" id="cb-api-key-row" style="margin-top:12px">
         <div class="cb-settings__field cb-settings__field--grow">
-          <label class="cb-settings__label">API Key</label>
+          <label class="cb-settings__label" data-t="settings.api_key"></label>
           <input id="cb-api-key" type="password" class="cb-settings__select"
-            placeholder="Enter your API key" autocomplete="off" style="width:100%">
+            data-t-placeholder="settings.api_key_placeholder" autocomplete="off" style="width:100%">
           <span id="cb-api-key-hint" style="font-size:0.78rem;color:#6b7280"></span>
         </div>
       </div>
       <div class="cb-settings__row" style="margin-top:16px">
-        <button id="cb-settings-save" class="cb-btn">Save</button>
+        <button id="cb-settings-save" class="cb-btn" data-t="settings.save"></button>
         <span id="cb-settings-status" class="cb-settings__status"></span>
       </div>
       <div class="cb-settings__current" id="cb-current-llm"></div>
     </section>
     <section class="cb-settings__section">
-      <div class="cb-settings__section-title">SPL Execution Limits</div>
+      <div class="cb-settings__section-title" data-t="settings.limits_section"></div>
       <div class="cb-settings__pair">
         <div class="cb-settings__field">
-          <label class="cb-settings__label">While Max Iterations</label>
+          <label class="cb-settings__label" data-t="settings.while_max_iter"></label>
           <input id="cb-while-max-iter" type="number" min="1" step="1" value="50"
             class="cb-settings__select" style="width:100px"
-            title="SPL_WHILE_MAX_ITER — max loop iterations before abort (default 15).">
+            data-t-title="settings.while_max_iter_title">
         </div>
         <div class="cb-settings__field">
-          <label class="cb-settings__label">Max LLM Calls</label>
+          <label class="cb-settings__label" data-t="settings.max_llm_calls"></label>
           <input id="cb-max-llm-calls" type="number" min="1" step="1" value="50"
             class="cb-settings__select" style="width:100px"
-            title="SPL_MAX_LLM_CALLS — max LLM GENERATE calls per workflow run.">
+            data-t-title="settings.max_llm_calls_title">
         </div>
       </div>
       <div class="cb-settings__row" style="margin-top:16px">
-        <button id="cb-spl-limits-save" class="cb-btn">Save</button>
+        <button id="cb-spl-limits-save" class="cb-btn" data-t="settings.save"></button>
         <span id="cb-spl-limits-status" class="cb-settings__status"></span>
       </div>
     </section>
   `
+  bindI18n(main)
   container.appendChild(main)
 
   // ── LLM section ────────────────────────────────────────────────────────────
@@ -181,9 +178,7 @@ export async function Settings(container) {
     const needsKey = API_KEY_ADAPTERS.has(adapter)
     apiKeyRow.style.display = needsKey ? '' : 'none'
     apiKeyInput.value = ''
-    apiKeyHint.textContent = needsKey && keysSet[adapter]
-      ? 'A key is already saved — enter a new one to replace it, or leave blank to keep it.'
-      : ''
+    i18n(apiKeyHint, () => (needsKey && keysSet[adapter] ? t('settings.key_saved') : ''))
   }
 
   adapterSel.addEventListener('change', () => {
@@ -206,7 +201,7 @@ export async function Settings(container) {
       const data = await res.json()
 
       // LLM
-      currentLlm.textContent = `Current: ${data.llm}`
+      i18n(currentLlm, 'settings.current', { vars: { llm: data.llm } })
       const [adapter, ...modelParts] = data.llm.split(':')
       const model = modelParts.join(':')
       if (ADAPTERS[adapter]) {
@@ -231,7 +226,7 @@ export async function Settings(container) {
       if (data.spl_max_llm_calls) maxLlmCallsInput.value = data.spl_max_llm_calls
     }
   } catch (_) {
-    status.textContent = 'API not reachable — run the backend to change settings'
+    i18n(status, 'settings.api_unreachable_hint')
     status.style.color = '#dc2626'
   }
 
@@ -261,15 +256,15 @@ export async function Settings(container) {
           openrouter: data.openrouter_api_key_set,
         }
         updateApiKeyVisibility()
-        currentLlm.textContent = `Current: ${llm}`
-        status.textContent = 'Saved'
+        i18n(currentLlm, 'settings.current', { vars: { llm } })
+        status.textContent = t('settings.saved')
         status.style.color = '#16a34a'
       } else {
-        status.textContent = 'Save failed'
+        status.textContent = t('settings.save_failed')
         status.style.color = '#dc2626'
       }
     } catch (_) {
-      status.textContent = 'API not reachable'
+      status.textContent = t('settings.api_unreachable')
       status.style.color = '#dc2626'
     }
     setTimeout(() => { status.textContent = '' }, 3000)
@@ -280,7 +275,7 @@ export async function Settings(container) {
     const whileMaxIter = Number(whileMaxIterInput.value)
     const maxLlmCalls = Number(maxLlmCallsInput.value)
     if (!Number.isInteger(whileMaxIter) || whileMaxIter < 1 || !Number.isInteger(maxLlmCalls) || maxLlmCalls < 1) {
-      splLimitsStatus.textContent = 'Enter valid integers ≥ 1'
+      splLimitsStatus.textContent = t('settings.invalid_limits')
       splLimitsStatus.style.color = '#dc2626'
       setTimeout(() => { splLimitsStatus.textContent = '' }, 3000)
       return
@@ -292,14 +287,14 @@ export async function Settings(container) {
         body: JSON.stringify({ spl_while_max_iter: whileMaxIter, spl_max_llm_calls: maxLlmCalls }),
       })
       if (res.ok) {
-        splLimitsStatus.textContent = 'Saved'
+        splLimitsStatus.textContent = t('settings.saved')
         splLimitsStatus.style.color = '#16a34a'
       } else {
-        splLimitsStatus.textContent = 'Save failed'
+        splLimitsStatus.textContent = t('settings.save_failed')
         splLimitsStatus.style.color = '#dc2626'
       }
     } catch (_) {
-      splLimitsStatus.textContent = 'API not reachable'
+      splLimitsStatus.textContent = t('settings.api_unreachable')
       splLimitsStatus.style.color = '#dc2626'
     }
     setTimeout(() => { splLimitsStatus.textContent = '' }, 3000)

@@ -149,6 +149,7 @@ on `window`:
   "books": [{"target": "some_concept", "file": "output/core.en/html/book_some_concept.html"}],
   "generated_concepts": [{"name": "some_concept", "label": "Some Concept", "file": "output/core.en/html/concept_some_concept.html"}],
   "tags": ["math"],
+  "i18n": {"zh": {"name": "…", "description": "…"}},
   "source": {"title": "...", "authors": "...", "license": "...", "url": "...", "attribution": "..."}
 }
 ```
@@ -173,8 +174,37 @@ from a specific external text (textbook, paper, corpus).
 
 ## i18n
 
-`src/i18n.js` provides a `t(key)` translation function. Translation keys are defined
-inline in `i18n.js`, not in external JSON files.
+UI strings live in `locales/ui.yaml` (`key → {lang: text}`, nested keys flattened to dotted
+keys); `src/i18n.js` imports it at build time (`@rollup/plugin-yaml`) and provides `t(key,
+vars)`, `tl(labels, fallback)` (pick a node label: locale → `en` → any → fallback) and
+`i18n(el, key, {attr, vars})`, which binds an element so `applyI18n()` can relabel it in
+place. The top-bar picker lists `_meta.languages`; switching dispatches `cb:localeChanged`
+— non-domain pages re-render, the domain page relabels in place and `GraphViewer` relabels
+graph nodes from each node's `labels` (emitted into `graph.html` by `concept_graph.py`).
+`spl/tools.py` reads the `book:` block for generated book pages. Markup can declare keys
+with `data-t` / `data-t-title` / `data-t-placeholder` and call `bindI18n(root)`. The domain
+page and Settings relabel in place (no re-render, so graph state and unsaved form input
+survive); other pages re-render.
+
+Content translations (chapter names/descriptions, concept labels) live in
+`locales/content.yaml` and are **build-time only**: `scripts/apply_content_locale.py` writes
+concept labels into each node's `labels:` in `graph.yaml` (line-level edits — nothing else in
+the file changes) and chapter text into `catalog.json` (`name`/`description` = en,
+`i18n.<lang>.{name,description}` = the rest), which `data/catalog.js`'s
+`catalogText(entry, field)` reads. Write both YAML files in block style, one language per
+line.
+
+Adding a language (e.g. `ja`):
+1. `python scripts/translate_locale.py --file ui --lang ja --name 日本語` — LLM-drafts every
+   missing key in place (ruamel keeps comments/layout) and registers `ja` with
+   `status: machine`, which the top-bar picker hides until a reviewer sets `reviewed`
+   (or `appConfig.showMachineLocales` is true).
+2. `python scripts/translate_locale.py --file content --lang ja`, then
+   `python scripts/apply_content_locale.py` and re-render `graph.html`.
+3. `python scripts/check_i18n.py` — errors on undefined keys, placeholder mismatches and
+   YAML pitfalls (unquoted `{…}` values, `no`/`yes` read as booleans); warns on gaps.
+
+Design and history: `docs/DEV/readme-i18n.md`.
 
 ## Extension points
 

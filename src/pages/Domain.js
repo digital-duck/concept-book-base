@@ -1,8 +1,8 @@
-import { loadCatalog } from '../data/catalog.js'
+import { getLocale, i18n } from '../i18n.js'
+import { loadCatalog, catalogText } from '../data/catalog.js'
 import { Header } from '../components/Header.js'
 import { GraphViewer } from '../components/GraphViewer.js'
 import { ContentPanel } from '../components/ContentPanel.js'
-import { getContentLang } from './Settings.js'
 
 export async function Domain(container, { id } = {}) {
   container._abortController?.abort()
@@ -26,14 +26,14 @@ export async function Domain(container, { id } = {}) {
   page.style.cssText = 'display:flex;flex-direction:column;height:100vh;overflow:hidden'
   container.appendChild(page)
 
-  page.appendChild(Header({ domainName: domain?.name || '' }))
+  page.appendChild(Header({ domainName: domain ? () => catalogText(domain, 'name') : '' }))
 
   const pickerBar = document.createElement('div')
   pickerBar.className = 'cb-domain-picker-bar'
 
   const lbl = document.createElement('span')
   lbl.className = 'cb-domain-picker-bar__label'
-  lbl.textContent = 'Domain'
+  i18n(lbl, 'domain.label')
   pickerBar.appendChild(lbl)
 
   const sel = document.createElement('select')
@@ -41,13 +41,13 @@ export async function Domain(container, { id } = {}) {
 
   const ph = document.createElement('option')
   ph.value = ''
-  ph.textContent = 'Select domain…'
+  i18n(ph, 'domain.select')
   sel.appendChild(ph)
 
   ;[...catalog].sort((a, b) => (a.id).localeCompare(b.id, 'zh')).forEach(d => {
     const opt = document.createElement('option')
     opt.value = d.id
-    opt.textContent = d.name || d.id
+    i18n(opt, () => catalogText(d, 'name'))
     if (d.id === id) opt.selected = true
     sel.appendChild(opt)
   })
@@ -61,7 +61,7 @@ export async function Domain(container, { id } = {}) {
   const loadBtn = document.createElement('button')
   loadBtn.type = 'button'
   loadBtn.className = 'cb-btn cb-btn--primary cb-domain-picker-bar__load'
-  loadBtn.textContent = 'Load'
+  i18n(loadBtn, 'domain.load')
   loadBtn.addEventListener('click', _load)
   pickerBar.appendChild(loadBtn)
 
@@ -72,24 +72,32 @@ export async function Domain(container, { id } = {}) {
   if (domain.source) {
     const attr = document.createElement('div')
     attr.className = 'cb-attribution'
-    attr.innerHTML = `Source: <a href="${domain.source.url}" target="_blank">${domain.source.title}</a> by ${domain.source.authors} (${domain.source.license}). ${domain.source.attribution}`
+    const { url, title, authors, license, attribution } = domain.source
+    const line = document.createElement('span')
+    i18n(line, 'domain.source', {
+      attr: 'innerHTML',
+      vars: { link: `<a href="${url}" target="_blank">${title}</a>`, authors, license },
+    })
+    attr.append(line, ` ${attribution}`)
     page.appendChild(attr)
   }
 
   const level = domain.default_level || 'intro'
-  const lang = getContentLang()
+  // Content language starts at the top-bar (UI) language; the content panel's
+  // Language dropdown can override it until the next top-bar change.
+  const lang = getLocale()
 
   const layout = document.createElement('main')
   layout.className = 'cb-ide-layout'
 
   const left = document.createElement('div')
   left.className = 'cb-ide-left'
-  const graphViewer = GraphViewer(domain, { level, lang })
+  const graphViewer = GraphViewer(domain, { level, lang, signal: abortController.signal })
   left.appendChild(graphViewer)
 
   const gutter = document.createElement('div')
   gutter.className = 'cb-ide-gutter'
-  gutter.title = 'Drag to resize'
+  i18n(gutter, 'domain.drag_resize', { attr: 'title' })
 
   const right = document.createElement('div')
   right.className = 'cb-ide-right'
