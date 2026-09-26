@@ -31,7 +31,8 @@ if ! command -v spl3 >/dev/null 2>&1; then
     exit 1
 fi
 
-API_PORT="$(grep -m1 '^API_PORT=' "$REPO/.env" 2>/dev/null | cut -d= -f2 || true)"
+# Use python-dotenv so ${VAR} references in .env are expanded before reading API_PORT.
+API_PORT="$(python3 -c "from dotenv import dotenv_values; print(dotenv_values('$REPO/.env').get('API_PORT', ''))" 2>/dev/null || true)"
 API_PORT="${API_PORT:-8200}"
 # Localhost-only: this backend now holds user-supplied LLM API keys
 # (Settings page) and exposes side-effecting GET endpoints (/api/generate,

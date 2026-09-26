@@ -65,10 +65,10 @@ export function ContentPanel(domain, { level = 'intro', lang = 'en', graphViewer
 
   const conceptIndex = new Map()
   _fillConceptIndex(conceptIndex, domain)
-  // 'gemma4' matches api/config.py's default_model — the dropdown always
+  // 'sonnet' matches api/config.py's default_model — the dropdown always
   // reflects a real, generatable model, never an empty '' that displays as
   // "— default —" but isn't a value the backend/catalog actually recognizes.
-  const state = { model: 'gemma4', level, lang }
+  const state = { model: 'sonnet', level, lang }
   // anchorNode: the node clicked in the *graph* — defines the TOC's scope
   // (its prerequisite path) and stays fixed while browsing the TOC.
   // displayNode: whichever node's content is currently shown — starts equal

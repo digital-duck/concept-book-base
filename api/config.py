@@ -1,15 +1,18 @@
 from pathlib import Path
 from pydantic import field_validator
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+
+load_dotenv(_REPO_ROOT / ".env", override=True)
 
 
 class Settings(BaseSettings):
     spl_dir: Path = Path.home() / "projects/digital-duck/SPL.py"
     public_domains: Path = _REPO_ROOT / "public" / "domains"
     llm: str = "claude_cli:claude-sonnet-5"
-    default_model: str = "gemma4"
+    default_model: str = "sonnet"
     spl_while_max_iter: int = 50
     spl_max_llm_calls: int = 50
 
@@ -22,7 +25,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openrouter_api_key: str = ""
 
-    model_config = {"env_prefix": "CB_", "env_file": ".env", "extra": "ignore"}
+    model_config = {"env_prefix": "CB_", "extra": "ignore"}
 
     # `.env` values for these arrive as literal, unresolved strings —
     # CB_SPL_DIR=~/... keeps its `~` (pydantic doesn't expand it), and

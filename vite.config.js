@@ -14,14 +14,17 @@ const repoName = path.basename(path.dirname(fileURLToPath(import.meta.url)))
 
 function readDotEnv() {
   try {
-    return Object.fromEntries(
-      fs.readFileSync(new URL('.env', import.meta.url).pathname, 'utf8')
-        .split('\n')
-        .filter(l => l.trim() && !l.startsWith('#'))
-        .map(l => l.split('=', 2))
-        .filter(p => p.length === 2)
-        .map(([k, v]) => [k.trim(), v.trim()])
-    )
+    const env = {}
+    fs.readFileSync(new URL('.env', import.meta.url).pathname, 'utf8')
+      .split('\n')
+      .filter(l => l.trim() && !l.startsWith('#'))
+      .map(l => l.split('=', 2))
+      .filter(p => p.length === 2)
+      .forEach(([k, v]) => {
+        // expand ${VAR} references using already-seen keys, then process.env as fallback
+        env[k.trim()] = v.trim().replace(/\$\{(\w+)\}/g, (_, name) => env[name] ?? process.env[name] ?? '')
+      })
+    return env
   } catch { return {} }
 }
 
