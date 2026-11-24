@@ -272,9 +272,16 @@ def _run_spl3(
     )
     assert proc.stdout is not None
     try:
+        # Once spl3 prints its "Status:" line the workflow has finished and
+        # everything after it is the generated book text echoed to stdout,
+        # which can legitimately contain words like "quota" or "rate
+        # limiting" — scanning it caused false aborts on successful runs.
+        scanning = True
         for line in proc.stdout:
+            if scanning and line.startswith("Status:"):
+                scanning = False
             low = line.lower()
-            if any(marker in low for marker in _SESSION_LIMIT_MARKERS):
+            if scanning and any(marker in low for marker in _SESSION_LIMIT_MARKERS):
                 proc.terminate()
                 try:
                     proc.wait(timeout=5)
