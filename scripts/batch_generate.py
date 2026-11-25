@@ -142,12 +142,27 @@ def _get_application_ids(domain_id: str) -> list[str]:
 
 
 def _already_generated(catalog_entry: dict, target: str, model: str, language: str, level: str) -> bool:
+    """True if this exact variant (target + model + language + level) is registered AND its book file is on disk."""
     variant_prefix = f"output/{level}.{language}/"
+    domain_dir = DOMAINS_DIR / catalog_entry["id"]
     return any(
         b["target"] == target and b.get("model") == model and b.get("language", "en") == language
         and b.get("file", "").startswith(variant_prefix)
+        and (domain_dir / b["file"]).is_file()
         for b in catalog_entry.get("books", [])
     )
+
+
+def _book_name(target: str, language: str) -> str:
+    """spl3 names the book file book_<target>.html for English and book_<target>_<lang>.html for any other language."""
+    return f"book_{target}.html" if language == "en" else f"book_{target}_{language}.html"
+
+
+def _book_path(domain_id: str, target: str, level: str, language: str, model: str) -> Path:
+    return DOMAINS_DIR / domain_id / "output" / f"{level}.{language}" / model / "html" / _book_name(target, language)
+
+
+_VARIANT_DIR = re.compile(r"^output/([^/]+\.[^/]+)/")   # output/<level>.<language>/...; legacy paths have no dot there
 
 
 def _mark_generated(domain_id: str, target: str, level: str, language: str, model: str) -> None:
@@ -169,19 +184,29 @@ def _mark_generated(domain_id: str, target: str, level: str, language: str, mode
             if d["id"] != domain_id:
                 continue
             books: list[dict] = d.setdefault("books", [])
-            book_file = f"output/{variant}/{model}/html/book_{target}.html"
-            if not any(
-                b["target"] == target and b.get("model") == model
+            book_file = f"output/{variant}/{model}/html/{_book_name(target, language)}"
+            # One row per target + model + language + LEVEL (the variant in the file path). Matching without the
+            # level made a college.zh run look already registered when intro.zh had the same target.
+            row = next((
+                b for b in books
+                if b["target"] == target and b.get("model") == model
                 and b.get("language", "en") == language
-                for b in books
-            ):
+                and b.get("file", "").startswith(f"output/{variant}/")
+            ), None)
+            if row is None:
                 books.append({"target": target, "file": book_file, "model": model, "language": language})
+            else:
+                row["file"] = book_file  # repair a row an older script version registered under the wrong (unsuffixed) name
             d["has_book"] = True
-            # Preserve legacy entries (no model field) and entries from other models/languages
-            other = [
-                c for c in d.get("generated_concepts", [])
-                if c.get("model") != model or c.get("language", "en") != language
-            ]
+            # Preserve entries from other models/languages, and from other levels of this model+language;
+            # replace this variant's own entries (and legacy ones with no level in their path).
+            def _keep(c: dict) -> bool:
+                if c.get("model") != model or c.get("language", "en") != language:
+                    return True
+                m = _VARIANT_DIR.match(c.get("file", ""))
+                return bool(m) and m.group(1) != variant
+
+            other = [c for c in d.get("generated_concepts", []) if _keep(c)]
             for c in new_concepts:
                 c["language"] = language
             d["generated_concepts"] = sorted(other + new_concepts, key=lambda c: c["label"])
@@ -502,6 +527,10 @@ def generate(
                 err=True,
             )
             sys.exit(EXIT_SESSION_LIMIT)
+
+        if ok and not _book_path(did, target, eff_level, language, model).is_file():
+            click.echo(f"[warn] {did}/{target}: spl3 exited 0 but wrote no {_book_name(target, language)} — not registered", err=True)
+            ok = False
 
         if ok:
             _mark_generated(did, target, eff_level, language, model)
